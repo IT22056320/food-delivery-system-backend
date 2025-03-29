@@ -55,6 +55,56 @@ exports.login = async (req, res) => {
   });
 };
 
+// 1. Request password reset
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  user.resetOtp = otp;
+  user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  await user.save();
+
+  await sendOtpEmail(user.email, otp);
+
+  res.json({ message: 'OTP sent to your email' });
+};
+
+// 2. Verify OTP
+exports.verifyResetOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  const user = await User.findOne({ email });
+
+  if (!user || user.resetOtp !== otp || user.resetOtpExpires < new Date()) {
+    return res.status(400).json({ error: 'Invalid or expired OTP' });
+  }
+
+  user.isResetVerified = true;
+  await user.save();
+
+  res.json({ message: 'OTP verified. You can now reset your password.' });
+};
+
+// 3. Reset password
+exports.resetPassword = async (req, res) => {
+  const { email, newPassword } = req.body;
+  const user = await User.findOne({ email });
+
+  if (!user || !user.isResetVerified) {
+    return res.status(403).json({ error: 'OTP verification required' });
+  }
+
+  user.password = await hashPassword(newPassword);
+  user.resetOtp = undefined;
+  user.resetOtpExpires = undefined;
+  user.isResetVerified = false;
+  await user.save();
+
+  res.json({ message: 'Password reset successful. You can now log in.' });
+};
+
 
 exports.logout = (req, res) => {
   res.clearCookie('token');

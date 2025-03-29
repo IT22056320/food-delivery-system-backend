@@ -8,6 +8,10 @@ router.post('/register', authCtrl.register);
 router.post('/verify-otp', authCtrl.verifyOtp);
 router.post('/login', authCtrl.login);
 router.post('/logout', authCtrl.logout);
+router.post('/forgot-password', authCtrl.forgotPassword);
+router.post('/verify-reset-otp', authCtrl.verifyResetOtp);
+router.post('/reset-password', authCtrl.resetPassword);
+
 router.get('/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })
   );
