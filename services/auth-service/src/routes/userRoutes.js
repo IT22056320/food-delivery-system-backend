@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const userController = require('../controllers/userController.js');
-const { protect, isAdmin } = require('../middlewares/authMiddleware.js');
+const userController = require('../controllers/userController');
+const { protect, isAdmin } = require('../middlewares/authMiddleware');
 
 // Protected routes
 router.get('/:id', protect, userController.getUserById);

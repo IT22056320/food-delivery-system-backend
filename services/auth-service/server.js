@@ -1,38 +1,46 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const session = require('express-session');
+const passport = require('passport');
 const connectDB = require('./src/config/db');
 const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const errorHandler = require('./src/middlewares/errorHandler'); // Global error handler
-const session = require('express-session');
-const passport = require('passport');
+
 require('./src/config/passport');
 
-// Initialize Express app
 const app = express();
 
-// Session middleware
+// ✅ CORS configuration
+app.use(cors({
+  origin: 'http://localhost:3000', // frontend origin
+  credentials: true,              // allow sending cookies
+}));
+
+// ✅ Express session setup (for passport if used)
 app.use(session({
   secret: 'your-session-secret',
   resave: false,
   saveUninitialized: false
 }));
+
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Middleware
+// ✅ JSON and cookie parsing
 app.use(express.json());
 app.use(cookieParser());
 
-// API Routes
+// ✅ Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 
-// Error Handling Middleware (must be last middleware)
+// ✅ Global error handler (should be last)
 app.use(errorHandler);
 
-// Start server only after DB connects
+// ✅ Connect DB and start server
 const PORT = process.env.PORT || 5000;
 connectDB().then(() => {
   app.listen(PORT, () => {

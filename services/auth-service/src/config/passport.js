@@ -16,7 +16,7 @@ passport.use(new GoogleStrategy({
         email: profile.emails[0].value,
         password: '', // optional or randomly generated
         isVerified: true,
-        isAdmin: false
+        role: 'user' // default role for Google OAuth users
       });
     }
 
@@ -26,7 +26,10 @@ passport.use(new GoogleStrategy({
   }
 }));
 
-passport.serializeUser((user, done) => done(null, user.id));
+passport.serializeUser((user, done) => {
+  done(null, user._id);
+});
+
 passport.deserializeUser(async (id, done) => {
   const user = await User.findById(id);
   done(null, user);
