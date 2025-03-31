@@ -1,10 +1,8 @@
-import type { Request, Response } from "express"
-import Restaurant from "../models/Restaurant"
-import type { RequestWithUser } from "../types"
-import mongoose from "mongoose"
+const Restaurant = require("../models/Restaurant")
+const mongoose = require("mongoose")
 
 // Create a new restaurant
-export const createRestaurant = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.createRestaurant = async (req, res) => {
     try {
         const { name, address, phone, email, description, cuisine, openingHours } = req.body
 
@@ -34,7 +32,7 @@ export const createRestaurant = async (req: RequestWithUser, res: Response): Pro
 }
 
 // Get all restaurants (for admin)
-export const getAllRestaurants = async (req: Request, res: Response): Promise<void> => {
+exports.getAllRestaurants = async (req, res) => {
     try {
         const restaurants = await Restaurant.find()
         res.status(200).json(restaurants)
@@ -46,7 +44,7 @@ export const getAllRestaurants = async (req: Request, res: Response): Promise<vo
 }
 
 // Get restaurant by ID
-export const getRestaurantById = async (req: Request, res: Response): Promise<void> => {
+exports.getRestaurantById = async (req, res) => {
     try {
         const restaurant = await Restaurant.findById(req.params.id)
 
@@ -64,7 +62,7 @@ export const getRestaurantById = async (req: Request, res: Response): Promise<vo
 }
 
 // Get restaurants owned by the logged-in user
-export const getMyRestaurants = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getMyRestaurants = async (req, res) => {
     try {
         if (!req.user) {
             res.status(401).json({ error: "User not authenticated" })
@@ -81,7 +79,7 @@ export const getMyRestaurants = async (req: RequestWithUser, res: Response): Pro
 }
 
 // Update restaurant
-export const updateRestaurant = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.updateRestaurant = async (req, res) => {
     try {
         const { id } = req.params
 
@@ -120,7 +118,7 @@ export const updateRestaurant = async (req: RequestWithUser, res: Response): Pro
 }
 
 // Update restaurant availability
-export const updateAvailability = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.updateAvailability = async (req, res) => {
     try {
         const { id } = req.params
         const { isAvailable } = req.body
@@ -155,7 +153,7 @@ export const updateAvailability = async (req: RequestWithUser, res: Response): P
 }
 
 // Delete restaurant
-export const deleteRestaurant = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.deleteRestaurant = async (req, res) => {
     try {
         const { id } = req.params
 

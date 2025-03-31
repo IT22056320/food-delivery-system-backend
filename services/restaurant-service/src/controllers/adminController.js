@@ -1,10 +1,8 @@
-import type { Response } from "express"
-import Restaurant from "../models/Restaurant"
-import Order from "../models/Order"
-import type { RequestWithUser } from "../types"
+const Restaurant = require("../models/Restaurant")
+const Order = require("../models/Order")
 
 // Verify restaurant
-export const verifyRestaurant = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.verifyRestaurant = async (req, res) => {
     try {
         const { id } = req.params
 
@@ -40,7 +38,7 @@ export const verifyRestaurant = async (req: RequestWithUser, res: Response): Pro
 }
 
 // Get all unverified restaurants
-export const getUnverifiedRestaurants = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getUnverifiedRestaurants = async (req, res) => {
     try {
         if (!req.user) {
             res.status(401).json({ error: "User not authenticated" })
@@ -63,7 +61,7 @@ export const getUnverifiedRestaurants = async (req: RequestWithUser, res: Respon
 }
 
 // Get restaurant statistics
-export const getRestaurantStats = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getRestaurantStats = async (req, res) => {
     try {
         const { restaurantId } = req.params
 
@@ -133,7 +131,7 @@ export const getRestaurantStats = async (req: RequestWithUser, res: Response): P
 }
 
 // Get system-wide statistics
-export const getSystemStats = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getSystemStats = async (req, res) => {
     try {
         if (!req.user) {
             res.status(401).json({ error: "User not authenticated" })

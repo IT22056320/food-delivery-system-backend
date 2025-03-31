@@ -1,10 +1,8 @@
-import type { Response } from "express"
-import Order from "../models/Order"
-import Restaurant from "../models/Restaurant"
-import type { RequestWithUser } from "../types"
+const Order = require("../models/Order")
+const Restaurant = require("../models/Restaurant")
 
 // Get all orders for a restaurant
-export const getRestaurantOrders = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getRestaurantOrders = async (req, res) => {
     try {
         const { restaurantId } = req.params
 
@@ -37,7 +35,7 @@ export const getRestaurantOrders = async (req: RequestWithUser, res: Response): 
 }
 
 // Get order by ID
-export const getOrderById = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getOrderById = async (req, res) => {
     try {
         const { id } = req.params
 
@@ -75,7 +73,7 @@ export const getOrderById = async (req: RequestWithUser, res: Response): Promise
 }
 
 // Update order status
-export const updateOrderStatus = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params
         const { status, estimatedDeliveryTime } = req.body
@@ -129,7 +127,7 @@ export const updateOrderStatus = async (req: RequestWithUser, res: Response): Pr
 }
 
 // Get pending orders for a restaurant
-export const getPendingOrders = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getPendingOrders = async (req, res) => {
     try {
         const { restaurantId } = req.params
 
@@ -165,7 +163,7 @@ export const getPendingOrders = async (req: RequestWithUser, res: Response): Pro
 }
 
 // Get completed orders for a restaurant
-export const getCompletedOrders = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getCompletedOrders = async (req, res) => {
     try {
         const { restaurantId } = req.params
 

@@ -1,11 +1,9 @@
-import type { Response } from "express"
-import MenuItem from "../models/MenuItem"
-import Restaurant from "../models/Restaurant"
-import type { RequestWithUser } from "../types"
-import mongoose from "mongoose"
+const MenuItem = require("../models/MenuItem")
+const Restaurant = require("../models/Restaurant")
+const mongoose = require("mongoose")
 
 // Create a new menu item
-export const createMenuItem = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.createMenuItem = async (req, res) => {
     try {
         const { restaurantId, name, description, price, category, image, preparationTime, ingredients, nutritionalInfo } =
             req.body
@@ -50,7 +48,7 @@ export const createMenuItem = async (req: RequestWithUser, res: Response): Promi
 }
 
 // Get all menu items for a restaurant
-export const getMenuItems = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getMenuItems = async (req, res) => {
     try {
         const { restaurantId } = req.params
 
@@ -65,7 +63,7 @@ export const getMenuItems = async (req: RequestWithUser, res: Response): Promise
 }
 
 // Get menu item by ID
-export const getMenuItemById = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.getMenuItemById = async (req, res) => {
     try {
         const { id } = req.params
 
@@ -85,7 +83,7 @@ export const getMenuItemById = async (req: RequestWithUser, res: Response): Prom
 }
 
 // Update menu item
-export const updateMenuItem = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.updateMenuItem = async (req, res) => {
     try {
         const { id } = req.params
 
@@ -131,7 +129,7 @@ export const updateMenuItem = async (req: RequestWithUser, res: Response): Promi
 }
 
 // Update menu item availability
-export const updateMenuItemAvailability = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.updateMenuItemAvailability = async (req, res) => {
     try {
         const { id } = req.params
         const { isAvailable } = req.body
@@ -173,7 +171,7 @@ export const updateMenuItemAvailability = async (req: RequestWithUser, res: Resp
 }
 
 // Delete menu item
-export const deleteMenuItem = async (req: RequestWithUser, res: Response): Promise<void> => {
+exports.deleteMenuItem = async (req, res) => {
     try {
         const { id } = req.params
 

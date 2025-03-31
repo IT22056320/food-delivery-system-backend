@@ -1,10 +1,4 @@
-import type { Request, Response, NextFunction } from "express"
-
-interface AppError extends Error {
-    statusCode?: number
-}
-
-const errorHandler = (err: AppError, req: Request, res: Response, next: NextFunction): void => {
+const errorHandler = (err, req, res, next) => {
     console.error("❌ Error:", err.stack)
 
     const statusCode = err.statusCode || 500
@@ -15,5 +9,5 @@ const errorHandler = (err: AppError, req: Request, res: Response, next: NextFunc
     })
 }
 
-export default errorHandler
+module.exports = errorHandler
 

@@ -1,7 +1,7 @@
-import mongoose, { Schema } from "mongoose"
-import type { IRestaurant } from "../types"
+const mongoose = require("mongoose")
+const { Schema } = mongoose
 
-const restaurantSchema: Schema = new Schema(
+const restaurantSchema = new Schema(
     {
         name: {
             type: String,
@@ -57,5 +57,5 @@ const restaurantSchema: Schema = new Schema(
     },
 )
 
-export default mongoose.model<IRestaurant>("Restaurant", restaurantSchema)
+module.exports = mongoose.model("Restaurant", restaurantSchema)
 

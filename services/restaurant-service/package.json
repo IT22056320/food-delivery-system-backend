@@ -2,12 +2,11 @@
   "name": "restaurant-service",
   "version": "1.0.0",
   "description": "Restaurant Management Service for Food Delivery App",
-  "main": "dist/server.js",
+  "main": "server.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn server.ts",
-    "lint": "eslint . --ext .ts"
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "lint": "eslint ."
   },
   "dependencies": {
     "cookie-parser": "^1.4.6",
@@ -18,13 +17,7 @@
     "mongoose": "^7.5.0"
   },
   "devDependencies": {
-    "@types/cookie-parser": "^1.4.3",
-    "@types/cors": "^2.8.13",
-    "@types/express": "^4.17.17",
-    "@types/jsonwebtoken": "^9.0.2",
-    "@types/node": "^20.5.7",
-    "ts-node": "^10.9.1",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.2.2"
+    "eslint": "^8.48.0",
+    "nodemon": "^3.0.1"
   }
 }

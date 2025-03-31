@@ -1,12 +1,12 @@
-import express from "express"
-import {
+const express = require("express")
+const {
     getRestaurantOrders,
     getOrderById,
     updateOrderStatus,
     getPendingOrders,
     getCompletedOrders,
-} from "../controllers/orderController"
-import { protect, isRestaurantOwner } from "../middlewares/authMiddleware"
+} = require("../controllers/orderController")
+const { protect, isRestaurantOwner } = require("../middlewares/authMiddleware")
 
 const router = express.Router()
 
@@ -17,5 +17,5 @@ router.get("/restaurant/:restaurantId/completed", protect, isRestaurantOwner, ge
 router.get("/:id", protect, getOrderById)
 router.patch("/:id/status", protect, isRestaurantOwner, updateOrderStatus)
 
-export default router
+module.exports = router
 
