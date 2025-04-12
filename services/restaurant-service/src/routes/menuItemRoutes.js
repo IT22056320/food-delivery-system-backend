@@ -1,13 +1,13 @@
-import express from "express"
-import {
+const express = require("express")
+const {
     createMenuItem,
     getMenuItems,
     getMenuItemById,
     updateMenuItem,
     updateMenuItemAvailability,
     deleteMenuItem,
-} from "../controllers/menuItemController"
-import { protect, isRestaurantOwner } from "../middlewares/authMiddleware"
+} = require("../controllers/menuItemController")
+const { protect, isRestaurantOwner } = require("../middlewares/authMiddleware")
 
 const router = express.Router()
 
@@ -21,5 +21,5 @@ router.put("/:id", protect, isRestaurantOwner, updateMenuItem)
 router.patch("/:id/availability", protect, isRestaurantOwner, updateMenuItemAvailability)
 router.delete("/:id", protect, isRestaurantOwner, deleteMenuItem)
 
-export default router
+module.exports = router
 

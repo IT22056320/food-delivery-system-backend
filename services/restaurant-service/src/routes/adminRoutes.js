@@ -1,11 +1,11 @@
-import express from "express"
-import {
+const express = require("express")
+const {
     verifyRestaurant,
     getUnverifiedRestaurants,
     getRestaurantStats,
     getSystemStats,
-} from "../controllers/adminController"
-import { protect, isAdmin } from "../middlewares/authMiddleware"
+} = require("../controllers/adminController")
+const { protect, isAdmin } = require("../middlewares/authMiddleware")
 
 const router = express.Router()
 
@@ -18,5 +18,5 @@ router.get("/restaurants/unverified", getUnverifiedRestaurants)
 router.get("/restaurants/:restaurantId/stats", getRestaurantStats)
 router.get("/system/stats", getSystemStats)
 
-export default router
+module.exports = router
 

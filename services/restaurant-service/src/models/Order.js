@@ -1,7 +1,7 @@
-import mongoose, { Schema } from "mongoose"
-import type { IOrder } from "../types"
+const mongoose = require("mongoose")
+const { Schema } = mongoose
 
-const orderSchema: Schema = new Schema(
+const orderSchema = new Schema(
     {
         restaurantId: {
             type: Schema.Types.ObjectId,
@@ -74,5 +74,5 @@ const orderSchema: Schema = new Schema(
     },
 )
 
-export default mongoose.model<IOrder>("Order", orderSchema)
+module.exports = mongoose.model("Order", orderSchema)
 
