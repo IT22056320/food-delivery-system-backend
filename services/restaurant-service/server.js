@@ -1,17 +1,16 @@
-import dotenv from "dotenv"
-dotenv.config()
+require("dotenv").config()
 
-import express, { type Express } from "express"
-import cors from "cors"
-import cookieParser from "cookie-parser"
-import { connectDB } from "./src/config/db"
-import restaurantRoutes from "./src/routes/restaurantRoutes"
-import menuItemRoutes from "./src/routes/menuItemRoutes"
-import orderRoutes from "./src/routes/orderRoutes"
-import adminRoutes from "./src/routes/adminRoutes"
-import errorHandler from "./src/middlewares/errorHandler"
+const express = require("express")
+const cors = require("cors")
+const cookieParser = require("cookie-parser")
+const { connectDB } = require("./src/config/db")
+const restaurantRoutes = require("./src/routes/restaurantRoutes")
+const menuItemRoutes = require("./src/routes/menuItemRoutes")
+const orderRoutes = require("./src/routes/orderRoutes")
+const adminRoutes = require("./src/routes/adminRoutes")
+const errorHandler = require("./src/middlewares/errorHandler")
 
-const app: Express = express()
+const app = express()
 
 // Middleware
 app.use(
