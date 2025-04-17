@@ -1,9 +1,10 @@
 const jwt = require('jsonwebtoken');
-const { jwtSecret } = require('../config/jwt');
+const { jwtSecret } = require('../config/jwt.js');
 
 // Protect route middleware
 const protect = (req, res, next) => {
   const token = req.cookies.token;
+  console.log('Token:', token, jwtSecret); // For debugging purposes
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
@@ -11,7 +12,7 @@ const protect = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    res.status(403).json({ error: 'Forbidden' });
+    res.status(403).json({ error: 'Forbidden', err });
   }
 };
 
