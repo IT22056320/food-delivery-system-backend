@@ -104,7 +104,6 @@ exports.getAvailableDeliveries = async (req, res) => {
                     const orderRes = await axios.get(`${process.env.ORDER_SERVICE_URL}/api/orders/${delivery.order_id}`, {
                         headers: {
                             Cookie: req.headers.cookie, // Forward auth cookie
-
                         },
                     })
 
@@ -574,4 +573,3 @@ exports.getDeliveryStats = async (req, res) => {
         return res.status(500).json({ message: "Error fetching delivery statistics", error: error.message })
     }
 }
-
