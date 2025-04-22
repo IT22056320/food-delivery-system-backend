@@ -17,7 +17,7 @@ router.get("/:id", getRestaurantById)
 
 // Protected routes
 router.post("/", protect, isRestaurantOwner, createRestaurant)
-router.get("/", protect, isAdmin, getAllRestaurants)
+router.get("/", protect, getAllRestaurants)
 router.get("/owner/my-restaurants", protect, getMyRestaurants)
 router.put("/:id", protect, isRestaurantOwner, updateRestaurant)
 router.patch("/:id/availability", protect, isRestaurantOwner, updateAvailability)
