@@ -101,6 +101,7 @@ exports.createOrder = async (req, res) => {
       }
     }
 
+    // Improve the delivery creation process with better error handling and logging
     // Create delivery record in delivery service
     try {
       // Get restaurant details
@@ -133,29 +134,31 @@ exports.createOrder = async (req, res) => {
               name: restaurant.name,
               phone: restaurant.phone || "Unknown",
             },
+            order: {
+              total_price: total_price,
+              items: items.length,
+            },
           },
           {
             headers: {
               "Content-Type": "application/json",
             },
-            // Don't use credentials: 'include' with axios, it doesn't work the same as fetch
-            // Instead, manually forward the auth token if needed
           },
         )
         console.log("Delivery record created successfully:", deliveryResponse.data)
+
+        // Update the order with the delivery ID
+        savedOrder.delivery_id = deliveryResponse.data._id
+        await savedOrder.save()
       } catch (axiosError) {
         console.error("Axios error creating delivery:", axiosError.message)
         if (axiosError.response) {
-          // The request was made and the server responded with a status code
-          // that falls out of the range of 2xx
           console.error("Response data:", axiosError.response.data)
           console.error("Response status:", axiosError.response.status)
           console.error("Response headers:", axiosError.response.headers)
         } else if (axiosError.request) {
-          // The request was made but no response was received
           console.error("No response received:", axiosError.request)
         } else {
-          // Something happened in setting up the request that triggered an Error
           console.error("Error setting up request:", axiosError.message)
         }
       }
