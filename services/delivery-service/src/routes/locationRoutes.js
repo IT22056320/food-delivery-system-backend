@@ -1,22 +1,16 @@
 const express = require("express")
-const locationController = require("../controllers/locationController")
-const { protect, isDeliveryPerson, isAdmin } = require("../middlewares/authMiddleware")
-
 const router = express.Router()
+const locationController = require("../controllers/locationController")
+const { protect } = require("../middlewares/authMiddleware")
 
-// Apply authentication middleware to all routes
-router.use(protect)
+// Update driver location
+router.post("/update", protect, locationController.updateLocation)
 
-// Update delivery person's location
-router.post("/update", isDeliveryPerson, locationController.updateLocation)
+// Get location for a specific delivery
+router.get("/delivery/:deliveryId", protect, locationController.getDeliveryLocation)
 
-// Get nearby delivery personnel (for restaurant and admin)
-router.get("/nearby", locationController.getNearbyDrivers)
+// Get nearby drivers
+router.get("/nearby", protect, locationController.getNearbyDrivers)
 
-// Get location of a specific delivery (accessible to customer, delivery person, restaurant, and admin)
-router.get("/delivery/:deliveryId", locationController.getDeliveryLocation)
-
-// Get all active delivery locations (admin only)
-router.get("/active", isAdmin, locationController.getAllActiveLocations)
-
+// Export the router
 module.exports = router

@@ -1,28 +1,26 @@
 const express = require("express")
 const deliveryController = require("../controllers/deliveryController")
-const { protect, isDeliveryPerson } = require("../middlewares/authMiddleware")
+const { protect, isDeliveryPerson, isAdmin, isRestaurant } = require("../middlewares/authMiddleware")
 
 const router = express.Router()
 
-// Create a new delivery (accessible to any authenticated user)
-// This route should NOT use the protect middleware to allow service-to-service communication
-router.post("/", deliveryController.createDelivery)
-
-// Get delivery by order ID (no authentication required for service-to-service communication)
-router.get("/by-order/:orderId", deliveryController.getDeliveryByOrderId)
-
-// Apply authentication middleware to all other routes
+// Apply authentication middleware to all routes
 router.use(protect)
 
-// Routes for delivery personnel
-router.get("/available", isDeliveryPerson, deliveryController.getAvailableDeliveries)
+// IMPORTANT: Specific routes must come BEFORE parameter routes
+// Routes for delivery persons
 router.get("/my-deliveries", isDeliveryPerson, deliveryController.getMyDeliveries)
+router.get("/available", isDeliveryPerson, deliveryController.getAvailableDeliveries)
 router.get("/history", isDeliveryPerson, deliveryController.getDeliveryHistory)
 router.get("/stats", isDeliveryPerson, deliveryController.getDeliveryStats)
+
+// Routes with parameters
+router.get("/:deliveryId", deliveryController.getDeliveryById)
 router.post("/:deliveryId/accept", isDeliveryPerson, deliveryController.acceptDelivery)
 router.patch("/:deliveryId/status", isDeliveryPerson, deliveryController.updateDeliveryStatus)
 
-// Get delivery by ID (accessible to delivery person, customer, and admin)
-router.get("/:deliveryId", deliveryController.getDeliveryById)
+// Admin routes
+router.post("/", deliveryController.createDelivery) // Allow any authenticated user to create delivery
+router.delete("/:deliveryId", isAdmin, deliveryController.deleteDelivery)
 
 module.exports = router

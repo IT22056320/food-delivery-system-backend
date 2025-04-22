@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken")
-const { verifyToken } = require("../config/jwt")
+const { jwtSecret } = require("../config/jwt")
 
 // Middleware to protect routes
 exports.protect = async (req, res, next) => {
@@ -16,11 +16,25 @@ exports.protect = async (req, res, next) => {
             return res.status(401).json({ message: "Not authorized, no token" })
         }
 
-        // Verify token
-        const decoded = await verifyToken(token)
-        req.user = decoded
+        try {
+            // Verify token directly with jwt.verify
+            const decoded = jwt.verify(token, jwtSecret)
 
-        next()
+            // Only log authentication for non-location update endpoints to reduce noise
+            if (!req.originalUrl.includes("/api/locations/update")) {
+                console.log("User authenticated:", {
+                    id: decoded.id,
+                    role: decoded.role,
+                    endpoint: req.originalUrl,
+                })
+            }
+
+            req.user = decoded
+            next()
+        } catch (tokenError) {
+            console.error("Token verification failed:", tokenError)
+            return res.status(401).json({ message: "Not authorized, token failed" })
+        }
     } catch (error) {
         console.error("Auth middleware error:", error)
         return res.status(401).json({ message: "Not authorized, token failed" })
@@ -29,9 +43,15 @@ exports.protect = async (req, res, next) => {
 
 // Middleware to verify user role is delivery person
 exports.isDeliveryPerson = (req, res, next) => {
+    // Check if user exists and has the delivery_person role
     if (req.user && req.user.role === "delivery_person") {
         next()
     } else {
+        console.log("Access denied: Not a delivery person", {
+            userId: req.user?.id,
+            userRole: req.user?.role,
+            requiredRole: "delivery_person",
+        })
         res.status(403).json({ message: "Not authorized as delivery person" })
     }
 }
@@ -41,16 +61,26 @@ exports.isAdmin = (req, res, next) => {
     if (req.user && req.user.role === "admin") {
         next()
     } else {
+        console.log("Access denied: Not an admin", {
+            userId: req.user?.id,
+            userRole: req.user?.role,
+            requiredRole: "admin",
+        })
         res.status(403).json({ message: "Not authorized as admin" })
     }
 }
 
-// Middleware to verify user role is restaurant
+// Middleware to verify user role is restaurant owner
 exports.isRestaurant = (req, res, next) => {
-    if (req.user && req.user.role === "restaurant") {
+    if (req.user && req.user.role === "restaurant_owner") {
         next()
     } else {
-        res.status(403).json({ message: "Not authorized as restaurant" })
+        console.log("Access denied: Not a restaurant owner", {
+            userId: req.user?.id,
+            userRole: req.user?.role,
+            requiredRole: "restaurant_owner",
+        })
+        res.status(403).json({ message: "Not authorized as restaurant owner" })
     }
 }
 

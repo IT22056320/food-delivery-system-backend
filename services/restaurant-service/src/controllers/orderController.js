@@ -3,37 +3,39 @@ const Restaurant = require("../models/Restaurant")
 const MenuItem = require("../models/MenuItem")
 
 // Get all orders for a restaurant
+// Add this function if it doesn't exist already
 exports.getRestaurantOrders = async (req, res) => {
     try {
-        const { restaurantId } = req.params
+        const restaurantId = req.params.restaurantId || req.user.restaurantId;
 
-        if (!req.user) {
-            res.status(401).json({ error: "User not authenticated" })
-            return
+        if (!restaurantId) {
+            return res.status(400).json({ message: "Restaurant ID is required" });
         }
 
-        // Check if user is the restaurant owner
-        const restaurant = await Restaurant.findById(restaurantId)
+        console.log(`Fetching orders for restaurant: ${restaurantId}`);
 
-        if (!restaurant) {
-            res.status(404).json({ error: "Restaurant not found" })
-            return
-        }
+        const orders = await Order.find({ restaurant_id: restaurantId }).sort({ createdAt: -1 });
+        console.log(`Found ${orders.length} orders for restaurant ${restaurantId}`);
 
-        if (restaurant.ownerId !== req.user._id && req.user.role !== "admin") {
-            res.status(403).json({ error: "Not authorized to view orders for this restaurant" })
-            return
-        }
+        // Enrich orders with customer info if needed
+        const enrichedOrders = await Promise.all(
+            orders.map(async (order) => {
+                try {
 
-        const orders = await Order.find({ restaurantId }).sort({ createdAt: -1 })
+                    return order;
+                } catch (error) {
+                    console.error(`Error processing order ${order._id}:`, error);
+                    return order;
+                }
+            })
+        );
 
-        res.status(200).json(orders)
+        return res.status(200).json(enrichedOrders);
     } catch (error) {
-        res.status(500).json({
-            error: error instanceof Error ? error.message : "Failed to fetch orders",
-        })
+        console.error("Error fetching restaurant orders:", error);
+        return res.status(500).json({ message: "Error fetching orders", error: error.message });
     }
-}
+};
 
 // Get order by ID
 exports.getOrderById = async (req, res) => {

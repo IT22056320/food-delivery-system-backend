@@ -428,6 +428,46 @@ exports.getDeliveryById = async (req, res) => {
     }
 }
 
+// Get all deliveries
+exports.getAllDeliveries = async (req, res) => {
+    try {
+        // Only admin can access this endpoint
+        if (req.user.role !== "admin") {
+            return res.status(403).json({ message: "Not authorized to access this resource" })
+        }
+
+        const deliveries = await Delivery.find()
+        return res.status(200).json(deliveries)
+    } catch (error) {
+        console.error("Error fetching all deliveries:", error)
+        return res.status(500).json({ message: "Error fetching all deliveries", error: error.message })
+    }
+}
+
+// Delete a delivery
+exports.deleteDelivery = async (req, res) => {
+    try {
+        const { deliveryId } = req.params
+
+        // Only admin can access this endpoint
+        if (req.user.role !== "admin") {
+            return res.status(403).json({ message: "Not authorized to access this resource" })
+        }
+
+        const delivery = await Delivery.findById(deliveryId)
+
+        if (!delivery) {
+            return res.status(404).json({ message: "Delivery not found" })
+        }
+
+        await Delivery.findByIdAndDelete(deliveryId)
+        return res.status(200).json({ message: "Delivery deleted successfully" })
+    } catch (error) {
+        console.error("Error deleting delivery:", error)
+        return res.status(500).json({ message: "Error deleting delivery", error: error.message })
+    }
+}
+
 // Get delivery statistics for the authenticated delivery person
 exports.getDeliveryStats = async (req, res) => {
     try {

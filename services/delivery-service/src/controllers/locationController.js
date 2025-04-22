@@ -17,49 +17,53 @@ exports.updateLocation = async (req, res) => {
             status: { $in: ["ASSIGNED", "PICKED_UP", "IN_TRANSIT"] },
         })
 
+        // Parse coordinates once to avoid repeated parsing
+        const parsedLng = Number.parseFloat(lng)
+        const parsedLat = Number.parseFloat(lat)
+        const parsedHeading = heading ? Number.parseFloat(heading) : 0
+        const parsedSpeed = speed ? Number.parseFloat(speed) : 0
+
         // Update or create location record
         const updatedLocation = await DeliveryLocation.findOneAndUpdate(
             { delivery_person_id: deliveryPersonId },
             {
                 location: {
                     type: "Point",
-                    coordinates: [Number.parseFloat(lng), Number.parseFloat(lat)], // MongoDB uses [longitude, latitude]
+                    coordinates: [parsedLng, parsedLat], // MongoDB uses [longitude, latitude]
                 },
                 status: status || (activeDelivery ? "BUSY" : "AVAILABLE"),
                 last_updated: new Date(),
                 delivery_id: activeDelivery ? activeDelivery._id : null,
-                heading: heading || 0,
-                speed: speed || 0,
+                heading: parsedHeading,
+                speed: parsedSpeed,
             },
             { new: true, upsert: true },
         )
 
-        // Emit location update via Socket.io
-        if (req.io) {
+        // Emit location update via Socket.io only if there's an active delivery
+        if (req.io && activeDelivery) {
             // Emit to all clients tracking this delivery
-            if (activeDelivery) {
-                req.io.to(`delivery:${activeDelivery._id}`).emit("locationUpdate", {
-                    deliveryId: activeDelivery._id,
-                    location: {
-                        lat: Number.parseFloat(lat),
-                        lng: Number.parseFloat(lng),
-                    },
-                    heading: heading || 0,
-                    speed: speed || 0,
-                    timestamp: new Date(),
-                })
-            }
+            req.io.to(`delivery:${activeDelivery._id}`).emit("locationUpdate", {
+                deliveryId: activeDelivery._id,
+                location: {
+                    lat: parsedLat,
+                    lng: parsedLng,
+                },
+                heading: parsedHeading,
+                speed: parsedSpeed,
+                timestamp: new Date(),
+            })
 
             // Emit to admin dashboard
             req.io.to("admin").emit("driverLocationUpdate", {
                 driverId: deliveryPersonId,
                 location: {
-                    lat: Number.parseFloat(lat),
-                    lng: Number.parseFloat(lng),
+                    lat: parsedLat,
+                    lng: parsedLng,
                 },
                 status: updatedLocation.status,
-                heading: heading || 0,
-                speed: speed || 0,
+                heading: parsedHeading,
+                speed: parsedSpeed,
                 timestamp: new Date(),
             })
         }
