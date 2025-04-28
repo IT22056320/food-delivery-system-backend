@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restaurant-service
+  labels:
+    app: restaurant-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: restaurant-service
+  template:
+    metadata:
+      labels:
+        app: restaurant-service
+    spec:
+      containers:
+      - name: restaurant-service
+        image: mdh00/restaurant-service
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5001
+        env:
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: restaurant-secrets
+              key: MONGO_URI
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: restaurant-secrets
+              key: JWT_SECRET
+        - name: EMAIL_USER
+          valueFrom:
+            secretKeyRef:
+              name: restaurant-secrets
+              key: EMAIL_USER
+        - name: EMAIL_PASS
+          valueFrom:
+            secretKeyRef:
+              name: restaurant-secrets
+              key: EMAIL_PASS
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: restaurant-secrets
+              key: GOOGLE_CLIENT_ID
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: restaurant-secrets
+              key: GOOGLE_CLIENT_SECRET
+        - name: PORT
+          value: "5001"
+      restartPolicy: Always
