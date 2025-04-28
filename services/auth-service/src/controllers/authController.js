@@ -1,7 +1,8 @@
 const User = require('../models/User');
 const { hashPassword, comparePasswords } = require('../utils/passwordUtils');
 const { generateToken } = require('../utils/tokenUtils');
-const { sendOtpEmail, sendConfirmationEmail } = require('../services/emailService');
+const { sendOtp } = require('../utils/notificationClient');
+const axios = require('axios');
 const crypto = require('crypto');
 
 exports.register = async (req, res) => {
@@ -17,7 +18,14 @@ exports.register = async (req, res) => {
     otp, 
     otpExpires: Date.now() + 300000 
   });
-  await sendOtpEmail(email, otp);
+
+await sendOtp({
+  email,
+  contactNumber: '+94718712335',  // if available
+  message: 'Your verification OTP',
+  otp,
+  channel: 'both',  // or 'sms' / 'both' (decide from user input)
+});
   res.status(201).json({ message: 'OTP sent to email', userId: user._id });
 };
 
@@ -32,7 +40,15 @@ exports.verifyOtp = async (req, res) => {
   user.isVerified = true;
   user.otp = null;
   await user.save();
-  await sendConfirmationEmail(user.email);
+  const { sendNotification } = require('../utils/notificationClient');
+
+await sendNotification({
+  email: user.email,
+  contactNumber: '+94718712335',
+  message: 'Your account has been successfully verified!',
+  channel: 'both',  // or 'sms' / 'both'
+});
+
 
   res.json({ message: 'User verified successfully' });
 };
@@ -78,8 +94,13 @@ exports.forgotPassword = async (req, res) => {
   user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   await user.save();
 
-  await sendOtpEmail(user.email, otp);
-
+  await sendOtp({
+    email: user.email,
+    contactNumber: '+94718712335',
+    message: 'Your password reset OTP',
+    otp,
+    channel: 'both',  // or 'sms' / 'both'
+  });  
   res.json({ message: 'OTP sent to your email' });
 };
 
