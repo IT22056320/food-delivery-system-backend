@@ -121,3 +121,11 @@ exports.logout = (req, res) => {
   res.clearCookie('token');
   res.json({ message: 'Logged out successfully' });
 };
+
+
+exports.authMe = async (req, res) => {
+  const user = await User.findById(req.user.id).select('-password -otp -resetOtp -otpExpires -resetOtpExpires');
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  res.json(user);
+};
