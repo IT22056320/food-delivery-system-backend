@@ -2,10 +2,10 @@
 
 ### 1.1 Clone the Repository
 
-
+```
 git clone https://github.com/IT22056320/food-delivery-system-backend.git
 cd food-delivery-system-backend
-
+```
 
 ### 1.2 Set Up Environment Variables
 
