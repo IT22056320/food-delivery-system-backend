@@ -1,110 +1,57 @@
 const jwt = require("jsonwebtoken")
-const { jwtSecret } = require("../config/jwt")
 
-// Middleware to protect routes
-exports.protect = async (req, res, next) => {
+// Verify JWT token
+exports.verifyToken = (req, res, next) => {
+    // Get token from cookies
+    const token = req.cookies.jwt
+
+    if (!token) {
+        return res.status(401).json({ message: "No token provided" })
+    }
+
     try {
-        // Get token from cookie or authorization header
-        let token
-        if (req.cookies && req.cookies.token) {
-            token = req.cookies.token
-        } else if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-            token = req.headers.authorization.split(" ")[1]
-        }
-
-        if (!token) {
-            return res.status(401).json({ message: "Not authorized, no token" })
-        }
-
-        try {
-            // Verify token directly with jwt.verify
-            const decoded = jwt.verify(token, jwtSecret)
-
-            // Only log authentication for non-location update endpoints to reduce noise
-            if (!req.originalUrl.includes("/api/locations/update")) {
-                console.log("User authenticated:", {
-                    id: decoded.id,
-                    role: decoded.role,
-                    endpoint: req.originalUrl,
-                })
-            }
-
-            req.user = decoded
-            next()
-        } catch (tokenError) {
-            console.error("Token verification failed:", tokenError)
-            return res.status(401).json({ message: "Not authorized, token failed" })
-        }
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret")
+        req.user = decoded
+        next()
     } catch (error) {
-        console.error("Auth middleware error:", error)
-        return res.status(401).json({ message: "Not authorized, token failed" })
+        return res.status(401).json({ message: "Invalid token" })
     }
 }
 
-// Middleware to verify user role is delivery person
+// Check if user is a delivery person
 exports.isDeliveryPerson = (req, res, next) => {
-    // Check if user exists and has the delivery_person role
     if (req.user && req.user.role === "delivery_person") {
         next()
     } else {
-        console.log("Access denied: Not a delivery person", {
-            userId: req.user?.id,
-            userRole: req.user?.role,
-            requiredRole: "delivery_person",
-        })
-        res.status(403).json({ message: "Not authorized as delivery person" })
+        res.status(403).json({ message: "Access denied. Delivery person role required." })
     }
 }
 
-// Middleware to verify user role is admin
+// Check if user is an admin
 exports.isAdmin = (req, res, next) => {
     if (req.user && req.user.role === "admin") {
         next()
     } else {
-        console.log("Access denied: Not an admin", {
-            userId: req.user?.id,
-            userRole: req.user?.role,
-            requiredRole: "admin",
-        })
-        res.status(403).json({ message: "Not authorized as admin" })
+        res.status(403).json({ message: "Access denied. Admin role required." })
     }
 }
 
-// Middleware to verify user role is restaurant owner
-exports.isRestaurant = (req, res, next) => {
-    if (req.user && req.user.role === "restaurant_owner") {
-        next()
-    } else {
-        console.log("Access denied: Not a restaurant owner", {
-            userId: req.user?.id,
-            userRole: req.user?.role,
-            requiredRole: "restaurant_owner",
-        })
-        res.status(403).json({ message: "Not authorized as restaurant owner" })
-    }
-}
+// Optional token verification (doesn't require authentication)
+exports.optionalVerifyToken = (req, res, next) => {
+    const token = req.cookies.jwt
 
-// Socket.io authentication middleware
-exports.verifySocketToken = (socket, next) => {
+    if (!token) {
+        req.user = null
+        return next()
+    }
+
     try {
-        const token = socket.handshake.auth.token || socket.handshake.query.token
-
-        if (!token) {
-            return next(new Error("Authentication error: No token provided"))
-        }
-
-        // Verify token
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-            if (err) {
-                return next(new Error("Authentication error: Invalid token"))
-            }
-
-            // Attach user info to socket
-            socket.user = decoded
-            next()
-        })
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret")
+        req.user = decoded
+        next()
     } catch (error) {
-        console.error("Socket authentication error:", error)
-        next(new Error("Authentication error"))
+        req.user = null
+        next()
     }
 }

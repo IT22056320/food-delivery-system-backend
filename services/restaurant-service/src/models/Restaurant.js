@@ -1,6 +1,19 @@
 const mongoose = require("mongoose")
 const { Schema } = mongoose
 
+// Define the GeoJSON schema for location
+const pointSchema = new Schema({
+    type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+    },
+    coordinates: {
+        type: [Number], // [longitude, latitude]
+        required: true,
+    },
+})
+
 const restaurantSchema = new Schema(
     {
         name: {
@@ -14,6 +27,11 @@ const restaurantSchema = new Schema(
         address: {
             type: String,
             required: true,
+        },
+        location: {
+            type: pointSchema,
+            index: "2dsphere", // Create a geospatial index
+            required: false, // Make it optional for backward compatibility
         },
         phone: {
             type: String,
@@ -58,4 +76,3 @@ const restaurantSchema = new Schema(
 )
 
 module.exports = mongoose.model("Restaurant", restaurantSchema)
-

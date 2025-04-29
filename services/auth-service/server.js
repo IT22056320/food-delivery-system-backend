@@ -7,7 +7,7 @@ const passport = require('passport');
 const connectDB = require('./src/config/db');
 const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
-const errorHandler = require('./src/middlewares/errorHandler'); // Global error handler
+const errorHandler = require('./src/middlewares/errorHandler');
 
 require('./src/config/passport');
 
