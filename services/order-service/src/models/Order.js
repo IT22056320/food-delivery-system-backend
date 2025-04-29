@@ -1,5 +1,6 @@
 const mongoose = require("mongoose")
 
+// Define a simpler schema structure that follows MongoDB's GeoJSON requirements exactly
 const orderSchema = new mongoose.Schema(
     {
         customer_id: {
@@ -38,6 +39,29 @@ const orderSchema = new mongoose.Schema(
         delivery_address: {
             type: String,
             required: true,
+        },
+        // Store standard lat/lng separately for easy access
+        delivery_coordinates: {
+            lat: {
+                type: Number,
+                required: true,
+            },
+            lng: {
+                type: Number,
+                required: true,
+            },
+        },
+        // This is the proper GeoJSON field that MongoDB expects
+        delivery_location: {
+            type: {
+                type: String,
+                enum: ["Point"],
+                required: true,
+            },
+            coordinates: {
+                type: [Number], // [longitude, latitude]
+                required: true,
+            },
         },
         order_status: {
             type: String,
@@ -82,8 +106,15 @@ const orderSchema = new mongoose.Schema(
         delivery_time: {
             type: Date,
         },
+        delivery_id: {
+            type: String,
+            default: null,
+        },
     },
     { timestamps: true },
 )
+
+// Create a 2dsphere index directly on the delivery_location field
+orderSchema.index({ delivery_location: "2dsphere" })
 
 module.exports = mongoose.model("Order", orderSchema)

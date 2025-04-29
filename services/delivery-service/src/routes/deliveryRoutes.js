@@ -1,26 +1,53 @@
 const express = require("express")
-const deliveryController = require("../controllers/deliveryController")
-const { protect, isDeliveryPerson, isAdmin, isRestaurant } = require("../middlewares/authMiddleware")
-
 const router = express.Router()
+const deliveryController = require("../controllers/deliveryController")
+const { verifyToken, isDeliveryPerson, isAdmin, optionalVerifyToken } = require("../middlewares/authMiddleware")
 
-// Apply authentication middleware to all routes
-router.use(protect)
+// Create a new delivery
+router.post("/", deliveryController.createDelivery)
 
-// IMPORTANT: Specific routes must come BEFORE parameter routes
-// Routes for delivery persons
-router.get("/my-deliveries", isDeliveryPerson, deliveryController.getMyDeliveries)
-router.get("/available", isDeliveryPerson, deliveryController.getAvailableDeliveries)
-router.get("/history", isDeliveryPerson, deliveryController.getDeliveryHistory)
-router.get("/stats", isDeliveryPerson, deliveryController.getDeliveryStats)
+// Get all deliveries (admin only)
+router.get("/", optionalVerifyToken, deliveryController.getAllDeliveries)
 
-// Routes with parameters
-router.get("/:deliveryId", deliveryController.getDeliveryById)
-router.post("/:deliveryId/accept", isDeliveryPerson, deliveryController.acceptDelivery)
-router.patch("/:deliveryId/status", isDeliveryPerson, deliveryController.updateDeliveryStatus)
+// Get delivery by ID
+router.get("/:id", optionalVerifyToken, deliveryController.getDeliveryById)
 
-// Admin routes
-router.post("/", deliveryController.createDelivery) // Allow any authenticated user to create delivery
-router.delete("/:deliveryId", isAdmin, deliveryController.deleteDelivery)
+// Get delivery by order ID
+router.get("/by-order/:orderId", optionalVerifyToken, deliveryController.getDeliveryByOrderId)
+
+// Update delivery status
+router.put("/:id/status", optionalVerifyToken, deliveryController.updateDeliveryStatus)
+
+// Update delivery person's current location
+router.post("/:id/location", optionalVerifyToken, deliveryController.updateDeliveryLocation)
+
+// Get delivery person's current location
+router.get("/:id/location", optionalVerifyToken, deliveryController.getDeliveryLocation)
+
+// Assign delivery to a delivery person
+router.put("/:id/assign", optionalVerifyToken, deliveryController.assignDelivery)
+
+// Get deliveries for a specific delivery person
+router.get(
+    "/delivery-person/:delivery_person_id/active",
+    optionalVerifyToken,
+    deliveryController.getDeliveriesForDeliveryPerson,
+)
+
+// Get delivery history for a specific delivery person
+router.get(
+    "/delivery-person/:delivery_person_id/history",
+    optionalVerifyToken,
+    deliveryController.getDeliveryHistoryForDeliveryPerson,
+)
+
+// Get available deliveries for assignment
+router.get("/available", optionalVerifyToken, deliveryController.getAvailableDeliveries)
+
+// Auto-assign delivery to nearest delivery person
+router.put("/:id/auto-assign", optionalVerifyToken, deliveryController.autoAssignDelivery)
+
+// Get orders that are ready for pickup
+router.get("/orders/ready-for-pickup", optionalVerifyToken, deliveryController.getOrdersReadyForPickup)
 
 module.exports = router
