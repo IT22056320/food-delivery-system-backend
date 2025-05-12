@@ -413,6 +413,12 @@ exports.assignDelivery = async (req, res) => {
     const { id } = req.params;
     const { delivery_person_id, delivery_person_name, accept } = req.body;
 
+    console.log("Assign delivery request:", {
+      id,
+      body: req.body,
+      user: req.user,
+    });
+
     // If this is a response to an assignment (accept/reject)
     if (typeof accept === "boolean") {
       const delivery = await Delivery.findById(id);
@@ -441,25 +447,67 @@ exports.assignDelivery = async (req, res) => {
       }
     }
 
-    // Manual assignment by admin
-    if (!delivery_person_id || !delivery_person_name) {
-      return res
-        .status(400)
-        .json({ message: "Delivery person ID and name are required" });
-    }
-
+    // Get the delivery
     const delivery = await Delivery.findById(id);
 
     if (!delivery) {
       return res.status(404).json({ message: "Delivery not found" });
     }
 
-    delivery.delivery_person_id = delivery_person_id;
-    delivery.delivery_person_name = delivery_person_name;
+    // Check if we have the authenticated user
+    if (req.user && req.user.id) {
+      // If we have an authenticated user, use their ID and name
+      delivery.delivery_person_id = req.user.id;
+      delivery.delivery_person_name = delivery_person_name || req.user.name;
+    } else if (delivery_person_id && delivery_person_name) {
+      // If both ID and name are provided in the request
+      delivery.delivery_person_id = delivery_person_id;
+      delivery.delivery_person_name = delivery_person_name;
+    } else if (delivery_person_name) {
+      // If only name is provided, try to find the user by name
+      try {
+        // In a real app, you would query your user database to find the user by name
+        // For now, we'll just use the name as the ID
+        delivery.delivery_person_id = delivery_person_name
+          .toLowerCase()
+          .replace(/\s+/g, "_");
+        delivery.delivery_person_name = delivery_person_name;
+      } catch (error) {
+        console.error("Error finding delivery person by name:", error);
+        return res
+          .status(400)
+          .json({
+            message: "Could not find delivery person with the provided name",
+          });
+      }
+    } else {
+      return res
+        .status(400)
+        .json({ message: "Delivery person ID and name are required" });
+    }
+
     delivery.status = "ASSIGNED";
     delivery.assigned_at = new Date();
 
     const updatedDelivery = await delivery.save();
+
+    // Update the order status to IN_PROGRESS
+    try {
+      await axios.put(
+        `http://localhost:5002/api/orders/${delivery.order_id}/status`,
+        {
+          status: "OUT_FOR_DELIVERY",
+        },
+        {
+          headers: {
+            Cookie: req.headers.cookie, // Forward auth cookie
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      // Continue even if order update fails
+    }
 
     res.status(200).json(updatedDelivery);
   } catch (error) {
