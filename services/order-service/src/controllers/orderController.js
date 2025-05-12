@@ -444,23 +444,53 @@ exports.updateOrderStatus = async (req, res) => {
   }
 }
 
-// Get orders that are ready for pickup
+// Add a function to get orders that are ready for pickup
 exports.getOrdersReadyForPickup = async (req, res) => {
   try {
     const orders = await Order.find({
       order_status: "READY_FOR_PICKUP",
-      delivery_id: { $exists: false }, // Only orders that don't have a delivery assigned yet
-    }).sort({ createdAt: 1 }) // Oldest first
+      delivery_id: { $exists: false }, // Only get orders that don't have a delivery assigned yet
+    }).sort({ createdAt: -1 })
 
-    res.status(200).json(orders)
+    // Enhance orders with restaurant information
+    const enhancedOrders = await Promise.all(
+      orders.map(async (order) => {
+        try {
+          // Get restaurant details from restaurant service
+          const restaurantResponse = await axios.get(`http://localhost:5001/api/restaurants/${order.restaurant_id}`, {
+            headers: {
+              Cookie: req.headers.cookie, // Forward auth cookie
+            },
+          })
+
+          const restaurant = restaurantResponse.data
+
+          return {
+            ...order.toObject(),
+            restaurant_name: restaurant.name,
+            restaurant_address: restaurant.address,
+            restaurant_phone: restaurant.phone,
+            restaurant_coordinates: {
+              lat: restaurant.location?.coordinates[1] || 0,
+              lng: restaurant.location?.coordinates[0] || 0,
+            },
+          }
+        } catch (error) {
+          console.error(`Error fetching restaurant details for order ${order._id}:`, error)
+          return order.toObject()
+        }
+      }),
+    )
+
+    res.status(200).json(enhancedOrders)
   } catch (error) {
     console.error("Error fetching orders ready for pickup:", error)
-    res.status(500).json({ message: "Error fetching orders", error: error.message })
+    res.status(500).json({ message: "Error fetching orders ready for pickup", error: error.message })
   }
 }
 
-// Update order with delivery ID
-exports.updateOrderDelivery = async (req, res) => {
+// Add a function to update order with delivery ID
+exports.updateOrderWithDeliveryId = async (req, res) => {
   try {
     const { id } = req.params
     const { delivery_id } = req.body
@@ -475,29 +505,19 @@ exports.updateOrderDelivery = async (req, res) => {
       return res.status(404).json({ message: "Order not found" })
     }
 
-    // Use findByIdAndUpdate to bypass validation
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      {
-        delivery_id: delivery_id,
-        // If the order is ready for pickup, update status to OUT_FOR_DELIVERY
-        ...(order.order_status === "READY_FOR_PICKUP"
-          ? {
-            order_status: "OUT_FOR_DELIVERY",
-            out_delivery_time: new Date(),
-          }
-          : {}),
-      },
-      { new: true, runValidators: false },
-    )
+    order.delivery_id = delivery_id
 
-    if (!updatedOrder) {
-      return res.status(404).json({ message: "Order not found" })
+    // If order is ready for pickup, update status to out for delivery
+    if (order.order_status === "READY_FOR_PICKUP") {
+      order.order_status = "OUT_FOR_DELIVERY"
+      order.out_delivery_time = new Date()
     }
+
+    const updatedOrder = await order.save()
 
     res.status(200).json(updatedOrder)
   } catch (error) {
     console.error("Error updating order with delivery ID:", error)
-    res.status(500).json({ message: "Error updating order", error: error.message })
+    res.status(500).json({ message: "Error updating order with delivery ID", error: error.message })
   }
 }
