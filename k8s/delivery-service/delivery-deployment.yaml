@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delivery-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: delivery-service
+  template:
+    metadata:
+      labels:
+        app: delivery-service
+    spec:
+      containers:
+        - name: delivery-container
+          image: pastadudde/delivery-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5003
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: delivery-secrets
+                  key: MONGO_URI
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: delivery-secrets
+                  key: JWT_SECRET
+            - name: EMAIL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: delivery-secrets
+                  key: EMAIL_USER
+            - name: EMAIL_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: delivery-secrets
+                  key: EMAIL_PASS
+            - name: PORT
+              valueFrom:
+                secretKeyRef:
+                  name: delivery-secrets
+                  key: PORT
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: delivery-secrets
+                  key: GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: delivery-secrets
+                  key: GOOGLE_CLIENT_SECRET
+            - name: ORDER_SERVICE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: delivery-secrets
+                  key: ORDER_SERVICE_URL

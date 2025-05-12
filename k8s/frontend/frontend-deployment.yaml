@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: pastadudde/frontend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://restaurant-service:5001/api"
+        - name: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+          value: "pk_test_51RFXHwRrlMKGq9bMbT1dBLXnGGkqMguFHeaqOdgM6zaEkUGEkyQSn0J72DtSnSHEPOJ7EqyQbNILaVpmFGNTSY6v008YHy958A"
+        - name: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+          value: "AIzaSyCmoMpEzjYLj2TH148EMIdzaHg0QzUj7ko"

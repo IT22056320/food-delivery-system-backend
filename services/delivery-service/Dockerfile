@@ -1,12 +1,13 @@
-FROM node:23.11.0-slim
+FROM node:18-alpine
 
 WORKDIR /app
 
 COPY package*.json ./
+
 RUN npm install
 
 COPY . .
 
-EXPOSE 5004
+EXPOSE 5003
 
 CMD ["node", "server.js"]

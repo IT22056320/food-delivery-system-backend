@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: order-container
-          image: mdh00/order-service
+          image: pastadudde/order-service
           imagePullPolicy: Always
           ports:
             - containerPort: 5002

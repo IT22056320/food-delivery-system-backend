@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: restaurant-service
-        image: mdh00/restaurant-service
+        image: pastadudde/restaurant-service
         imagePullPolicy: Always
         ports:
         - containerPort: 5001

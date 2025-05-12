@@ -35,3 +35,24 @@ spec:
                 name: restaurant-service
                 port:
                   number: 5001
+          - path: /api/deliveries
+            pathType: Prefix
+            backend:
+              service:
+                name: delivery-service
+                port:
+                  number: 5003
+          - path: /api/notifications
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: 5004
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 3000
