@@ -17,8 +17,9 @@ router.get("/", protect, orderController.getUserOrders);
 // Get order by ID
 router.get("/:id", protect, orderController.getOrderById);
 
-// Update order status
+// Update order status - support both PUT and PATCH
 router.put("/:id/status", protect, orderController.updateOrderStatus);
+router.patch("/:id/status", protect, orderController.updateOrderStatus);
 
 // Get orders for a restaurant
 router.get(

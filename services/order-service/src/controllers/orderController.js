@@ -58,6 +58,7 @@ exports.createOrder = async (req, res) => {
       payment_method,
       payment_status: "PENDING",
       extra_notes: extra_notes || [],
+      order_status: "PENDING", // Explicitly set to PENDING
     });
 
     const savedOrder = await newOrder.save();
@@ -122,10 +123,9 @@ exports.updatePaymentStatus = async (req, res) => {
     order.payment_status = paymentStatus;
     order.stripe_payment_id = paymentIntentId;
 
-    // If payment is completed and it was pending before, update order status
-    if (paymentStatus === "COMPLETED" && order.order_status === "PENDING") {
-      order.order_status = "CONFIRMED";
-    }
+    // IMPORTANT: Do NOT automatically change order status when payment is completed
+    // This was causing orders to automatically become CONFIRMED
+    // Let restaurant owners manually accept orders
 
     await order.save();
 
