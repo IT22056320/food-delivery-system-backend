@@ -1,30 +1,40 @@
 const express = require("express");
-const OrderController = require("../controllers/orderController");
-const { protect } = require("../middlewares/authMiddleware");
+const orderController = require("../controllers/orderController");
+const {
+  protect,
+  isAdmin,
+  isRestaurantOwner,
+} = require("../middlewares/authMiddleware");
 
-const orderRoutes = express.Router();
-
-// Apply authentication middleware to all routes
-orderRoutes.use(protect);
-
-// IMPORTANT: Specific routes must come BEFORE parameterized routes
-// Get orders that are ready for pickup
-orderRoutes.get("/ready-for-pickup", OrderController.getOrdersReadyForPickup);
-
-// Get all orders for the authenticated user
-orderRoutes.get("/", OrderController.getUserOrders);
-
-// Routes with parameters should come after specific routes
-// Get order by ID
-orderRoutes.get("/:orderId", OrderController.getOrderById);
-
-// Update order status
-orderRoutes.patch("/:orderId/status", OrderController.updateOrderStatus);
-
-// Update an order with a delivery ID
-orderRoutes.put("/:id/delivery", OrderController.updateOrderWithDeliveryId);
+const router = express.Router();
 
 // Create a new order
-orderRoutes.post("/", OrderController.createOrder);
+router.post("/", protect, orderController.createOrder);
 
-module.exports = orderRoutes;
+// Get all orders for the current user
+router.get("/", protect, orderController.getUserOrders);
+
+// Get order by ID
+router.get("/:id", protect, orderController.getOrderById);
+
+// Update order status
+router.put("/:id/status", protect, orderController.updateOrderStatus);
+
+// Get orders for a restaurant
+router.get(
+  "/restaurant/:restaurantId",
+  protect,
+  isRestaurantOwner,
+  orderController.getRestaurantOrders
+);
+
+// Get all orders (admin only)
+router.get("/admin/all", protect, isAdmin, orderController.getAllOrders);
+
+// Update payment status (called by payment service)
+router.post("/:orderId/payment-update", orderController.updatePaymentStatus);
+
+// Process refund (called by payment service)
+router.post("/:orderId/refund", orderController.processRefund);
+
+module.exports = router;

@@ -1,627 +1,328 @@
 const Order = require("../models/Order");
 const axios = require("axios");
 
-// Initialize Stripe with proper error handling
-let stripe;
-try {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    console.error("STRIPE_SECRET_KEY is not defined in environment variables");
-    // Provide a fallback or throw a more descriptive error
-  } else {
-    stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-  }
-} catch (error) {
-  console.error("Failed to initialize Stripe:", error.message);
-}
-
 // Create a new order
 exports.createOrder = async (req, res) => {
-  const customer_id = req.user.id;
-  console.log("Customer ID:", customer_id, req.user.id);
-  const {
-    restaurant_id,
-    items,
-    total_price,
-    extra_notes,
-    delivery_address,
-    delivery_location,
-    order_status,
-    payment_status,
-    payment_method,
-    stripe_payment_id,
-    order_processing_time,
-    out_delivery_time,
-  } = req.body;
-
-  console.log("Incoming request body:", req.body); // Log the request body
-
-  if (
-    !customer_id ||
-    !restaurant_id ||
-    !items ||
-    !total_price ||
-    !delivery_address
-  ) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
   try {
-    // Extract coordinates from the request
-    let lat, lng;
-
-    if (delivery_location && delivery_location.coordinates) {
-      lat = Number(delivery_location.coordinates.lat);
-      lng = Number(delivery_location.coordinates.lng);
-    } else {
-      return res
-        .status(400)
-        .json({ message: "Delivery coordinates are required" });
-    }
-
-    // Create a new order with properly formatted GeoJSON
-    const newOrder = new Order({
-      customer_id,
+    const {
       restaurant_id,
       items,
       total_price,
-      extra_notes,
       delivery_address,
-      // Store standard coordinates for easy access
+      delivery_location,
+      payment_method,
+      extra_notes,
+    } = req.body;
+
+    // Validate required fields
+    if (
+      !restaurant_id ||
+      !items ||
+      !total_price ||
+      !delivery_address ||
+      !payment_method
+    ) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Validate delivery location
+    if (
+      !delivery_location ||
+      !delivery_location.coordinates ||
+      !delivery_location.coordinates.lat ||
+      !delivery_location.coordinates.lng
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Valid delivery location coordinates are required" });
+    }
+
+    // Create new order
+    const newOrder = new Order({
+      customer_id: req.user.id,
+      restaurant_id,
+      items,
+      total_price,
+      delivery_address,
       delivery_coordinates: {
-        lat: lat,
-        lng: lng,
+        lat: delivery_location.coordinates.lat,
+        lng: delivery_location.coordinates.lng,
       },
-      // Create proper GeoJSON Point object directly at the top level
       delivery_location: {
         type: "Point",
-        coordinates: [lng, lat], // GeoJSON format: [longitude, latitude]
+        coordinates: [
+          delivery_location.coordinates.lng,
+          delivery_location.coordinates.lat,
+        ], // GeoJSON format: [longitude, latitude]
       },
-      order_status,
-      payment_status,
       payment_method,
-      stripe_payment_id,
-      order_processing_time,
-      out_delivery_time,
+      payment_status: "PENDING",
+      extra_notes: extra_notes || [],
     });
-
-    console.log("New order object:", newOrder); // Log the new order object
 
     const savedOrder = await newOrder.save();
 
-    console.log("Saved order:", savedOrder); // Log the saved order
-
     // If payment method is card, create a payment intent
-    if (payment_method === "CARD" && !stripe_payment_id) {
+    if (payment_method === "CARD") {
       try {
-        // Check if Stripe is properly initialized
-        if (!stripe) {
-          throw new Error(
-            "Stripe is not properly initialized. Please check your API key."
-          );
-        }
-
-        // Create a payment intent with Stripe
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(total_price * 100), // Stripe requires amount in cents
-          currency: "usd",
-          metadata: {
-            orderId: savedOrder._id.toString(),
-            customerId: customer_id,
-          },
-          automatic_payment_methods: {
-            enabled: true,
-          },
-        });
-
-        // Update the order with the payment intent ID
-        savedOrder.stripe_payment_id = paymentIntent.id;
-        await savedOrder.save();
-
-        // Return the order with client secret for frontend processing
-        return res.status(201).json({
-          order: savedOrder,
-          clientSecret: paymentIntent.client_secret,
-        });
-      } catch (stripeError) {
-        console.error("Stripe error:", stripeError);
-        // If Stripe fails, still return the order but with an error flag
-        return res.status(201).json({
-          order: savedOrder,
-          paymentError: "Failed to create payment intent. Please try again.",
-          stripeErrorMessage: stripeError.message,
-        });
-      }
-    }
-
-    // Improve the delivery creation process with better error handling and logging
-    // Create delivery record in delivery service
-    try {
-      // Get restaurant details
-      const restaurantRes = await axios.get(
-        `http://localhost:5001/api/restaurants/${restaurant_id}`
-      );
-      const restaurant = restaurantRes.data;
-
-      // Make sure we have valid restaurant data
-      if (!restaurant || !restaurant.address) {
-        console.error("Invalid restaurant data:", restaurant);
-        throw new Error("Invalid restaurant data");
-      }
-
-      // Extract restaurant coordinates properly
-      let restaurantLat = 0,
-        restaurantLng = 0;
-      if (restaurant.location && restaurant.location.coordinates) {
-        // Check if it's GeoJSON format [lng, lat] or standard {lat, lng}
-        if (Array.isArray(restaurant.location.coordinates)) {
-          restaurantLng = restaurant.location.coordinates[0];
-          restaurantLat = restaurant.location.coordinates[1];
-        } else {
-          restaurantLat = restaurant.location.coordinates.lat || 0;
-          restaurantLng = restaurant.location.coordinates.lng || 0;
-        }
-      }
-
-      console.log("Creating delivery record for order:", savedOrder._id);
-      console.log("Restaurant details:", restaurant.name, restaurant.address);
-      console.log("Restaurant coordinates:", restaurantLat, restaurantLng);
-      console.log("Delivery address:", delivery_address);
-      console.log("Delivery coordinates:", lat, lng);
-
-      // Create delivery record with more detailed error handling
-      try {
-        const deliveryResponse = await axios.post(
-          "http://localhost:5003/api/deliveries",
+        // Call the payment service to create a payment intent
+        const paymentResponse = await axios.post(
+          "http://localhost:5004/api/payments/create-payment-intent",
           {
-            order_id: savedOrder._id.toString(), // Ensure it's a string
-            pickup_location: {
-              address: restaurant.address,
-              coordinates: {
-                lat: restaurantLat,
-                lng: restaurantLng,
-              },
-            },
-            delivery_location: {
-              address: delivery_address,
-              coordinates: {
-                lat: lat,
-                lng: lng,
-              },
-            },
-            customer_contact: {
-              name: req.user.name || "Customer",
-              phone: req.user.phone || "Unknown",
-            },
-            restaurant_contact: {
-              name: restaurant.name,
-              phone: restaurant.phone || "Unknown",
-            },
-            order: {
-              total_price: total_price,
-              items: items.length,
+            amount: total_price,
+            order_id: savedOrder._id,
+            metadata: {
+              customer_id: req.user.id,
+              restaurant_id,
             },
           },
           {
             headers: {
               "Content-Type": "application/json",
-              Cookie: req.headers.cookie, // Forward auth cookie
+              Cookie: req.headers.cookie, // Forward the auth cookie
             },
           }
         );
-        console.log(
-          "Delivery record created successfully:",
-          deliveryResponse.data
-        );
 
-        // Update the order with the delivery ID
-        savedOrder.delivery_id = deliveryResponse.data._id;
-        await savedOrder.save();
-      } catch (axiosError) {
-        console.error("Axios error creating delivery:", axiosError.message);
-        if (axiosError.response) {
-          console.error("Response data:", axiosError.response.data);
-          console.error("Response status:", axiosError.response.status);
-          console.error("Response headers:", axiosError.response.headers);
-        } else if (axiosError.request) {
-          console.error("No response received:", axiosError.request);
-        } else {
-          console.error("Error setting up request:", axiosError.message);
-        }
+        // Return the order with client secret
+        return res.status(201).json({
+          order: savedOrder,
+          clientSecret: paymentResponse.data.clientSecret,
+          paymentIntentId: paymentResponse.data.paymentIntentId,
+        });
+      } catch (paymentError) {
+        console.error("Payment service error:", paymentError.message);
+        // If payment service fails, still return the order but with an error
+        return res.status(201).json({
+          order: savedOrder,
+          paymentError: "Failed to create payment intent. Please try again.",
+        });
       }
-    } catch (deliveryError) {
-      console.error(
-        "Error in delivery creation process:",
-        deliveryError.message
-      );
-      // Continue execution even if delivery creation fails
     }
 
-    return res.status(201).json(savedOrder);
+    // For cash on delivery, just return the order
+    return res.status(201).json({ order: savedOrder });
   } catch (error) {
-    console.error("Error in createOrder:", error);
-    return res
-      .status(500)
-      .json({ message: "Error creating order", error: error.message });
+    console.error("Order creation error:", error);
+    res.status(500).json({ error: error.message || "Error creating order" });
   }
 };
 
-// Get an order by ID
-exports.getOrderById = async (req, res) => {
-  const { orderId } = req.params;
-
-  if (!orderId) {
-    return res.status(400).json({ message: "Order ID is required" });
-  }
-
-  try {
-    console.log(`Fetching order with ID: ${orderId}`);
-    const order = await Order.findById(orderId);
-
-    if (!order) {
-      console.log(`Order with ID ${orderId} not found`);
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    console.log(
-      `Found order: ${order._id}, restaurant ID: ${order.restaurant_id}`
-    );
-
-    // Create a base enriched order object
-    const baseOrder = {
-      _id: order._id,
-      customer_id: order.customer_id,
-      items: order.items,
-      total_price: order.total_price,
-      extra_notes: order.extra_notes,
-      delivery_address: order.delivery_address,
-      delivery_coordinates: order.delivery_coordinates,
-      delivery_location: order.delivery_location,
-      order_status: order.order_status,
-      payment_status: order.payment_status,
-      payment_method: order.payment_method,
-      stripe_payment_id: order.stripe_payment_id,
-      order_processing_time: order.order_processing_time,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-      restaurant: {
-        id: order.restaurant_id,
-        name: "Unknown Restaurant", // Default value
-      },
-    };
-
-    // Try to fetch restaurant information
-    try {
-      console.log(`Fetching restaurant with ID: ${order.restaurant_id}`);
-      const restaurantRes = await axios.get(
-        `http://localhost:5001/api/restaurants/${order.restaurant_id}`
-      );
-      const restaurant = restaurantRes.data;
-
-      console.log(`Found restaurant: ${restaurant.name}`);
-      baseOrder.restaurant = {
-        id: restaurant._id,
-        name: restaurant.name,
-        address: restaurant.address,
-        phone: restaurant.phone,
-      };
-    } catch (restaurantError) {
-      console.error(`Error fetching restaurant: ${restaurantError.message}`);
-      // Continue with default restaurant info
-    }
-
-    // Try to enrich items with menu information
-    try {
-      const enrichedItems = await Promise.all(
-        order.items.map(async (item) => {
-          try {
-            if (!item.menu_id) {
-              return {
-                _id: item._id,
-                quantity: item.quantity,
-                price: item.price,
-                name: item.name || "Unknown Item",
-              };
-            }
-
-            const menuRes = await axios.get(
-              `http://localhost:5001/api/menu-items/${item.menu_id}`
-            );
-            const menu = menuRes.data;
-
-            return {
-              _id: item._id,
-              quantity: item.quantity,
-              price: item.price,
-              name: menu.name || item.name || "Unknown Item",
-            };
-          } catch (menuError) {
-            console.error(
-              `Error fetching menu item ${item.menu_id}: ${menuError.message}`
-            );
-            return {
-              _id: item._id,
-              quantity: item.quantity,
-              price: item.price,
-              name: item.name || "Unknown Item",
-            };
-          }
-        })
-      );
-
-      baseOrder.items = enrichedItems;
-    } catch (itemsError) {
-      console.error(`Error enriching items: ${itemsError.message}`);
-      // Continue with basic items
-    }
-
-    // Try to fetch delivery information
-    try {
-      console.log(`Fetching delivery for order: ${order._id}`);
-      const deliveryRes = await axios.get(
-        `http://localhost:5003/api/deliveries/by-order/${order._id}`,
-        {
-          headers: {
-            Cookie: req.headers.cookie, // Forward auth cookie
-          },
-        }
-      );
-      baseOrder.delivery = deliveryRes.data;
-      console.log(`Found delivery: ${deliveryRes.data._id}`);
-    } catch (deliveryError) {
-      console.log(
-        `No delivery information found for this order: ${deliveryError.message}`
-      );
-      baseOrder.delivery = null;
-    }
-
-    return res.status(200).json(baseOrder);
-  } catch (error) {
-    console.error(`Order fetch error: ${error.message}`);
-    return res
-      .status(500)
-      .json({ message: "Error fetching order", error: error.message });
-  }
-};
-
-// Get all orders for a user
-exports.getUserOrders = async (req, res) => {
-  try {
-    // Get user ID from the authenticated user in the request
-    const userId = req.user.id;
-
-    if (!userId) {
-      return res.status(400).json({ message: "User ID is required" });
-    }
-
-    console.log(`Fetching orders for user: ${userId}`);
-
-    const orders = await Order.find({ customer_id: userId }).sort({
-      createdAt: -1,
-    });
-    console.log(`Found ${orders.length} orders for user ${userId}`);
-
-    // Enrich orders with basic restaurant info
-    const enrichedOrders = await Promise.all(
-      orders.map(async (order) => {
-        try {
-          const restaurantRes = await axios.get(
-            `http://localhost:5001/api/restaurants/${order.restaurant_id}`
-          );
-          const restaurant = restaurantRes.data;
-
-          // Try to fetch delivery information
-          let delivery = null;
-          try {
-            const deliveryRes = await axios.get(
-              `http://localhost:5003/api/deliveries/by-order/${order._id}`,
-              {
-                headers: {
-                  Cookie: req.headers.cookie, // Forward auth cookie
-                },
-              }
-            );
-            delivery = deliveryRes.data;
-          } catch (error) {
-            console.log(`No delivery information found for order ${order._id}`);
-          }
-
-          return {
-            ...order.toObject(),
-            restaurant_name: restaurant.name,
-            restaurant: {
-              id: restaurant._id,
-              name: restaurant.name,
-            },
-            delivery: delivery,
-          };
-        } catch (error) {
-          console.error(
-            `Error fetching restaurant for order ${order._id}:`,
-            error
-          );
-          return {
-            ...order.toObject(),
-            restaurant_name: "Unknown Restaurant",
-          };
-        }
-      })
-    );
-
-    return res.status(200).json(enrichedOrders);
-  } catch (error) {
-    console.error("Error fetching user orders:", error);
-    return res
-      .status(500)
-      .json({ message: "Error fetching orders", error: error.message });
-  }
-};
-
-// Update order status - COMPLETELY REWRITTEN to bypass validation
-exports.updateOrderStatus = async (req, res) => {
+// Update order payment status
+exports.updatePaymentStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { status } = req.body;
+    const { paymentStatus, paymentId, paymentIntentId } = req.body;
 
-    if (!orderId || !status) {
-      return res
-        .status(400)
-        .json({ message: "Order ID and status are required" });
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
     }
 
-    console.log(`Updating order ${orderId} status to ${status}`);
+    order.payment_status = paymentStatus;
+    order.stripe_payment_id = paymentIntentId;
 
-    // Use findByIdAndUpdate with { new: true } to return the updated document
-    // Use { runValidators: false } to bypass validation for fields that aren't being updated
-    const updatedOrder = await Order.findByIdAndUpdate(
-      orderId,
-      { order_status: status },
-      {
-        new: true,
-        runValidators: false,
-        // Set timestamps if needed based on status
-        $set:
-          status === "OUT_FOR_DELIVERY"
-            ? { out_delivery_time: new Date() }
-            : status === "DELIVERED"
-            ? { delivery_time: new Date() }
-            : {},
-      }
-    );
-
-    if (!updatedOrder) {
-      return res.status(404).json({ message: "Order not found" });
+    // If payment is completed and it was pending before, update order status
+    if (paymentStatus === "COMPLETED" && order.order_status === "PENDING") {
+      order.order_status = "CONFIRMED";
     }
 
-    console.log("Order status updated successfully:", updatedOrder);
+    await order.save();
 
-    // If order is cancelled and payment was made, initiate refund
-    if (
-      status === "CANCELLED" &&
-      updatedOrder.payment_status === "COMPLETED" &&
-      updatedOrder.stripe_payment_id
-    ) {
+    // If payment is completed, create delivery record
+    if (paymentStatus === "COMPLETED") {
       try {
-        const refund = await stripe.refunds.create({
-          payment_intent: updatedOrder.stripe_payment_id,
-        });
-
-        // Update payment status separately
-        await Order.findByIdAndUpdate(
-          orderId,
-          {
-            payment_status: "REFUNDED",
-            refund_id: refund.id,
-          },
-          { runValidators: false }
+        // Get restaurant details
+        const restaurantRes = await axios.get(
+          `http://localhost:5001/api/restaurants/${order.restaurant_id}`
         );
-      } catch (refundError) {
-        console.error("Refund error:", refundError);
-        return res
-          .status(500)
-          .json({
-            message: "Error processing refund",
-            error: refundError.message,
-          });
+        const restaurant = restaurantRes.data;
+
+        // Create delivery record
+        await axios.post(
+          "http://localhost:5003/api/deliveries",
+          {
+            order_id: order._id,
+            pickup_location: {
+              address: restaurant.address,
+              coordinates: restaurant.location?.coordinates || {
+                lat: 0,
+                lng: 0,
+              },
+            },
+            delivery_location: {
+              address: order.delivery_address,
+              coordinates: order.delivery_coordinates,
+            },
+            customer_contact: {
+              name: req.user?.name || "Customer",
+              phone: req.user?.phone || "Unknown",
+            },
+            restaurant_contact: {
+              name: restaurant.name,
+              phone: restaurant.phone || "Unknown",
+            },
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Cookie: req.headers.cookie, // Forward the auth cookie
+            },
+          }
+        );
+      } catch (deliveryError) {
+        console.error("Error creating delivery record:", deliveryError.message);
+        // Continue execution even if delivery creation fails
       }
     }
 
-    return res.status(200).json(updatedOrder);
+    res.status(200).json({
+      success: true,
+      order,
+    });
   } catch (error) {
-    console.error("Error updating order status:", error);
-    return res.status(500).json({ message: "Error updating order", error });
-  }
-};
-
-// Add a function to get orders that are ready for pickup
-exports.getOrdersReadyForPickup = async (req, res) => {
-  try {
-    const orders = await Order.find({
-      order_status: "READY_FOR_PICKUP",
-      delivery_id: { $exists: false }, // Only get orders that don't have a delivery assigned yet
-    }).sort({ createdAt: -1 });
-
-    // Enhance orders with restaurant information
-    const enhancedOrders = await Promise.all(
-      orders.map(async (order) => {
-        try {
-          // Get restaurant details from restaurant service
-          const restaurantResponse = await axios.get(
-            `http://localhost:5001/api/restaurants/${order.restaurant_id}`,
-            {
-              headers: {
-                Cookie: req.headers.cookie, // Forward auth cookie
-              },
-            }
-          );
-
-          const restaurant = restaurantResponse.data;
-
-          return {
-            ...order.toObject(),
-            restaurant_name: restaurant.name,
-            restaurant_address: restaurant.address,
-            restaurant_phone: restaurant.phone,
-            restaurant_coordinates: {
-              lat: restaurant.location?.coordinates[1] || 0,
-              lng: restaurant.location?.coordinates[0] || 0,
-            },
-          };
-        } catch (error) {
-          console.error(
-            `Error fetching restaurant details for order ${order._id}:`,
-            error
-          );
-          return order.toObject();
-        }
-      })
-    );
-
-    res.status(200).json(enhancedOrders);
-  } catch (error) {
-    console.error("Error fetching orders ready for pickup:", error);
+    console.error("Error updating payment status:", error);
     res
       .status(500)
-      .json({
-        message: "Error fetching orders ready for pickup",
-        error: error.message,
-      });
+      .json({ error: error.message || "Error updating payment status" });
   }
 };
 
-// Add a function to update order with delivery ID
-exports.updateOrderWithDeliveryId = async (req, res) => {
+// Process refund for an order
+exports.processRefund = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { delivery_id } = req.body;
+    const { orderId } = req.params;
+    const { refundId, refundAmount } = req.body;
 
-    if (!delivery_id) {
-      return res.status(400).json({ message: "Delivery ID is required" });
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
     }
 
-    const order = await Order.findById(id);
+    order.payment_status = "REFUNDED";
+    order.order_status = "REFUNDED";
+    order.refund_id = refundId;
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      order,
+    });
+  } catch (error) {
+    console.error("Error processing refund:", error);
+    res.status(500).json({ error: error.message || "Error processing refund" });
+  }
+};
+
+// Get all orders for the current user
+exports.getUserOrders = async (req, res) => {
+  try {
+    const orders = await Order.find({ customer_id: req.user.id }).sort({
+      createdAt: -1,
+    });
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("Error fetching user orders:", error);
+    res.status(500).json({ error: error.message || "Error fetching orders" });
+  }
+};
+
+// Get order by ID
+exports.getOrderById = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Check if user is authorized to view this order
+    if (
+      req.user.role !== "admin" &&
+      req.user.role !== "restaurant_owner" &&
+      order.customer_id !== req.user.id
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Not authorized to view this order" });
+    }
+
+    res.status(200).json(order);
+  } catch (error) {
+    console.error("Error fetching order:", error);
+    res.status(500).json({ error: error.message || "Error fetching order" });
+  }
+};
+
+// Update order status
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const order = await Order.findById(req.params.id);
 
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ error: "Order not found" });
     }
 
-    order.delivery_id = delivery_id;
+    // Validate status transition
+    const validTransitions = {
+      PENDING: ["CONFIRMED", "CANCELLED"],
+      CONFIRMED: ["PREPARING", "CANCELLED"],
+      PREPARING: ["READY_FOR_PICKUP", "CANCELLED"],
+      READY_FOR_PICKUP: ["OUT_FOR_DELIVERY", "CANCELLED"],
+      OUT_FOR_DELIVERY: ["DELIVERED", "CANCELLED"],
+      DELIVERED: ["REFUNDED"],
+      CANCELLED: [],
+      REFUNDED: [],
+    };
 
-    // If order is ready for pickup, update status to out for delivery
-    if (order.order_status === "READY_FOR_PICKUP") {
-      order.order_status = "OUT_FOR_DELIVERY";
+    if (!validTransitions[order.order_status].includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status transition from ${order.order_status} to ${status}`,
+      });
+    }
+
+    order.order_status = status;
+
+    // Update timestamps based on status
+    if (status === "OUT_FOR_DELIVERY") {
       order.out_delivery_time = new Date();
+    } else if (status === "DELIVERED") {
+      order.delivery_time = new Date();
     }
 
-    const updatedOrder = await order.save();
+    await order.save();
 
-    res.status(200).json(updatedOrder);
+    res.status(200).json(order);
   } catch (error) {
-    console.error("Error updating order with delivery ID:", error);
+    console.error("Error updating order status:", error);
     res
       .status(500)
-      .json({
-        message: "Error updating order with delivery ID",
-        error: error.message,
-      });
+      .json({ error: error.message || "Error updating order status" });
+  }
+};
+
+// Get orders for a restaurant
+exports.getRestaurantOrders = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const orders = await Order.find({ restaurant_id: restaurantId }).sort({
+      createdAt: -1,
+    });
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("Error fetching restaurant orders:", error);
+    res.status(500).json({ error: error.message || "Error fetching orders" });
+  }
+};
+
+// Get all orders (admin only)
+exports.getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("Error fetching all orders:", error);
+    res.status(500).json({ error: error.message || "Error fetching orders" });
   }
 };
