@@ -1,6 +1,6 @@
-const axios = require('axios');
+const axios = require("axios");
 
-const NOTIFICATION_SERVICE_URL = 'http://localhost:5001/api/notifications';
+const NOTIFICATION_SERVICE_URL = "http://localhost:5004/api/notifications";
 
 exports.sendOtp = async ({ email, contactNumber, message, otp, channel }) => {
   await axios.post(`${NOTIFICATION_SERVICE_URL}/send-otp`, {
@@ -12,7 +12,12 @@ exports.sendOtp = async ({ email, contactNumber, message, otp, channel }) => {
   });
 };
 
-exports.sendNotification = async ({ email, contactNumber, message, channel }) => {
+exports.sendNotification = async ({
+  email,
+  contactNumber,
+  message,
+  channel,
+}) => {
   await axios.post(`${NOTIFICATION_SERVICE_URL}/send-notification`, {
     email,
     contactNumber,

@@ -19,6 +19,6 @@ mongoose.connect(process.env.MONGO_URI, {
 // Routes
 app.use('/api/notifications', notificationRoutes);
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5004;
 app.listen(PORT, () => console.log(`Notification Service running on port ${PORT}`));
 
