@@ -215,9 +215,20 @@ exports.getPendingOrders = async (req, res) => {
       return;
     }
 
+    // Include all statuses that are considered "pending" (not completed)
     const orders = await Order.find({
       restaurantId,
-      status: { $in: ["pending", "accepted", "preparing"] },
+      status: {
+        $in: [
+          "pending",
+          "accepted",
+          "confirmed",
+          "preparing",
+          "ready",
+          "ready_for_pickup",
+          "out_for_delivery",
+        ],
+      },
     }).sort({ createdAt: 1 });
 
     res.status(200).json(orders);

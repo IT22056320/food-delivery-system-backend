@@ -29,6 +29,14 @@ router.get(
   orderController.getRestaurantOrders
 );
 
+// Add this route to your existing routes
+router.get(
+  "/restaurant/:restaurantId/status",
+  protect,
+  isRestaurantOwner,
+  orderController.getRestaurantOrdersByStatus
+);
+
 // Get all orders (admin only)
 router.get("/admin/all", protect, isAdmin, orderController.getAllOrders);
 

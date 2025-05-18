@@ -316,6 +316,46 @@ exports.getRestaurantOrders = async (req, res) => {
   }
 };
 
+// Get orders for a restaurant with status filtering
+exports.getRestaurantOrdersByStatus = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const { status } = req.query;
+
+    let statusFilter = {};
+
+    if (status === "pending") {
+      statusFilter = {
+        order_status: {
+          $in: [
+            "PENDING",
+            "CONFIRMED",
+            "PREPARING",
+            "READY_FOR_PICKUP",
+            "OUT_FOR_DELIVERY",
+          ],
+        },
+      };
+    } else if (status === "completed") {
+      statusFilter = {
+        order_status: {
+          $in: ["DELIVERED", "CANCELLED", "REFUNDED"],
+        },
+      };
+    }
+
+    const orders = await Order.find({
+      restaurant_id: restaurantId,
+      ...statusFilter,
+    }).sort({ createdAt: status === "pending" ? 1 : -1 });
+
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("Error fetching restaurant orders by status:", error);
+    res.status(500).json({ error: error.message || "Error fetching orders" });
+  }
+};
+
 // Get all orders (admin only)
 exports.getAllOrders = async (req, res) => {
   try {
