@@ -49,6 +49,13 @@ router.get(
   deliveryController.getDeliveryHistoryForDeliveryPerson
 );
 
+// Get earnings stats for a specific delivery person - MUST come before /:id route
+router.get(
+  "/delivery-person/:delivery_person_id/earnings",
+  optionalVerifyToken,
+  deliveryController.getEarningsStats
+);
+
 // Get delivery by ID - This should come AFTER all other GET routes with specific paths
 router.get("/:id", optionalVerifyToken, deliveryController.getDeliveryById);
 

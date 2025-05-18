@@ -56,7 +56,32 @@ exports.createDelivery = async (req, res) => {
       });
     }
 
-    // Create new delivery with validated coordinates
+    // Try to fetch complete order details from the order service
+    let orderDetails = order;
+    try {
+      const orderResponse = await axios.get(
+        `http://localhost:5002/api/orders/${order_id}`,
+        {
+          headers: {
+            Cookie: req.headers.cookie, // Forward auth cookie
+          },
+        }
+      );
+
+      if (orderResponse.data) {
+        orderDetails = {
+          total_price: orderResponse.data.total_price || order.total_price || 0,
+          items: orderResponse.data.items?.length || order.items || 0,
+          subtotal: orderResponse.data.subtotal || 0,
+          tax_amount: orderResponse.data.tax_amount || 0,
+        };
+      }
+    } catch (error) {
+      console.error("Error fetching order details:", error);
+      // Continue with the provided order details
+    }
+
+    // Create new delivery with validated coordinates and order details
     const newDelivery = new Delivery({
       order_id,
       pickup_location: {
@@ -81,15 +106,12 @@ exports.createDelivery = async (req, res) => {
         name: "Restaurant",
         phone: "Not available",
       },
-      order: {
-        total_price: order.total_price || 0,
-        items: order.items || 0,
-      },
+      order: orderDetails,
       status: "PENDING",
       estimated_delivery_time: new Date(Date.now() + 45 * 60000), // Default 45 minutes from now
     });
 
-    console.log("Saving delivery with coordinates:", {
+    console.log("Saving delivery with coordinates and order details:", {
       pickup: newDelivery.pickup_location.coordinates,
       delivery: newDelivery.delivery_location.coordinates,
       order: newDelivery.order,
@@ -199,6 +221,39 @@ exports.getDeliveryById = async (req, res) => {
       return res.status(404).json({ message: "Delivery not found" });
     }
 
+    // If order details are missing or incomplete, try to fetch them
+    if (
+      !delivery.order ||
+      !delivery.order.total_price ||
+      delivery.order.total_price === 0
+    ) {
+      try {
+        const orderResponse = await axios.get(
+          `http://localhost:5002/api/orders/${delivery.order_id}`,
+          {
+            headers: {
+              Cookie: req.headers.cookie, // Forward auth cookie
+            },
+          }
+        );
+
+        if (orderResponse.data) {
+          delivery.order = {
+            total_price: orderResponse.data.total_price || 0,
+            items: orderResponse.data.items?.length || 0,
+            subtotal: orderResponse.data.subtotal || 0,
+            tax_amount: orderResponse.data.tax_amount || 0,
+          };
+
+          // Save the updated delivery with order details
+          await delivery.save();
+        }
+      } catch (error) {
+        console.error("Error fetching order details:", error);
+        // Continue with the existing delivery
+      }
+    }
+
     res.status(200).json(delivery);
   } catch (error) {
     console.error("Error fetching delivery:", error);
@@ -219,6 +274,39 @@ exports.getDeliveryByOrderId = async (req, res) => {
         .json({ message: "Delivery not found for this order" });
     }
 
+    // If order details are missing or incomplete, try to fetch them
+    if (
+      !delivery.order ||
+      !delivery.order.total_price ||
+      delivery.order.total_price === 0
+    ) {
+      try {
+        const orderResponse = await axios.get(
+          `http://localhost:5002/api/orders/${delivery.order_id}`,
+          {
+            headers: {
+              Cookie: req.headers.cookie, // Forward auth cookie
+            },
+          }
+        );
+
+        if (orderResponse.data) {
+          delivery.order = {
+            total_price: orderResponse.data.total_price || 0,
+            items: orderResponse.data.items?.length || 0,
+            subtotal: orderResponse.data.subtotal || 0,
+            tax_amount: orderResponse.data.tax_amount || 0,
+          };
+
+          // Save the updated delivery with order details
+          await delivery.save();
+        }
+      } catch (error) {
+        console.error("Error fetching order details:", error);
+        // Continue with the existing delivery
+      }
+    }
+
     res.status(200).json(delivery);
   } catch (error) {
     console.error("Error fetching delivery by order ID:", error);
@@ -228,7 +316,7 @@ exports.getDeliveryByOrderId = async (req, res) => {
   }
 };
 
-// Update delivery status
+// Update the updateDeliveryStatus function to properly handle delivery completion
 exports.updateDeliveryStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -253,11 +341,52 @@ exports.updateDeliveryStatus = async (req, res) => {
       delivery.picked_up_at = new Date();
     } else if (status === "DELIVERED") {
       delivery.delivered_at = new Date();
+
+      // If order details are missing or incomplete, try to fetch them before completing
+      if (
+        !delivery.order ||
+        !delivery.order.total_price ||
+        delivery.order.total_price === 0
+      ) {
+        try {
+          console.log(
+            `Fetching order details for delivery ${id} before completion`
+          );
+          const orderResponse = await axios.get(
+            `http://localhost:5002/api/orders/${delivery.order_id}`,
+            {
+              headers: {
+                Cookie: req.headers.cookie, // Forward auth cookie
+              },
+            }
+          );
+
+          if (orderResponse.data) {
+            delivery.order = {
+              total_price: orderResponse.data.total_price || 0,
+              items: orderResponse.data.items?.length || 0,
+              subtotal: orderResponse.data.subtotal || 0,
+              tax_amount: orderResponse.data.tax_amount || 0,
+            };
+            console.log(
+              `Updated delivery ${id} with order details:`,
+              delivery.order
+            );
+          }
+        } catch (error) {
+          console.error(
+            `Failed to fetch order details for delivery ${id}:`,
+            error
+          );
+          // Continue with the existing delivery
+        }
+      }
     } else if (status === "CANCELLED") {
       delivery.cancelled_at = new Date();
     }
 
     const updatedDelivery = await delivery.save();
+    console.log(`Delivery ${id} status updated to ${status}:`, updatedDelivery);
 
     // Update order status in order service
     try {
@@ -287,12 +416,10 @@ exports.updateDeliveryStatus = async (req, res) => {
     res.status(200).json(updatedDelivery);
   } catch (error) {
     console.error("Error updating delivery status:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error updating delivery status",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error updating delivery status",
+      error: error.message,
+    });
   }
 };
 
@@ -348,12 +475,10 @@ exports.updateDeliveryLocation = async (req, res) => {
     res.status(200).json(updatedDelivery);
   } catch (error) {
     console.error("Error updating delivery location:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error updating delivery location",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error updating delivery location",
+      error: error.message,
+    });
   }
 };
 
@@ -398,12 +523,10 @@ exports.getDeliveryLocation = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching delivery location:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error fetching delivery location",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching delivery location",
+      error: error.message,
+    });
   }
 };
 
@@ -411,7 +534,8 @@ exports.getDeliveryLocation = async (req, res) => {
 exports.assignDelivery = async (req, res) => {
   try {
     const { id } = req.params;
-    const { delivery_person_id, delivery_person_name, accept } = req.body;
+    const { delivery_person_id, delivery_person_name, accept, order_details } =
+      req.body;
 
     console.log("Assign delivery request:", {
       id,
@@ -474,16 +598,56 @@ exports.assignDelivery = async (req, res) => {
         delivery.delivery_person_name = delivery_person_name;
       } catch (error) {
         console.error("Error finding delivery person by name:", error);
-        return res
-          .status(400)
-          .json({
-            message: "Could not find delivery person with the provided name",
-          });
+        return res.status(400).json({
+          message: "Could not find delivery person with the provided name",
+        });
       }
     } else {
       return res
         .status(400)
         .json({ message: "Delivery person ID and name are required" });
+    }
+
+    // Update order details if provided
+    if (order_details && (order_details.total_price || order_details.items)) {
+      delivery.order = {
+        ...delivery.order,
+        total_price:
+          order_details.total_price || delivery.order.total_price || 0,
+        items: order_details.items || delivery.order.items || 0,
+      };
+    }
+
+    // If order details are still missing or incomplete, try to fetch them
+    if (
+      !delivery.order ||
+      !delivery.order.total_price ||
+      delivery.order.total_price === 0
+    ) {
+      try {
+        const orderResponse = await axios.get(
+          `http://localhost:5002/api/orders/${delivery.order_id}`,
+          {
+            headers: {
+              Cookie: req.headers.cookie, // Forward auth cookie
+            },
+          }
+        );
+
+        if (orderResponse.data) {
+          delivery.order = {
+            total_price:
+              orderResponse.data.total_price || delivery.order.total_price || 0,
+            items:
+              orderResponse.data.items?.length || delivery.order.items || 0,
+            subtotal: orderResponse.data.subtotal || 0,
+            tax_amount: orderResponse.data.tax_amount || 0,
+          };
+        }
+      } catch (error) {
+        console.error("Error fetching order details:", error);
+        // Continue with the existing delivery
+      }
     }
 
     delivery.status = "ASSIGNED";
@@ -528,7 +692,48 @@ exports.getDeliveriesForDeliveryPerson = async (req, res) => {
       status: { $nin: ["DELIVERED", "CANCELLED"] },
     }).sort({ createdAt: -1 });
 
-    res.status(200).json(deliveries);
+    // Enhance deliveries with complete order details if needed
+    const enhancedDeliveries = await Promise.all(
+      deliveries.map(async (delivery) => {
+        // If order details are missing or incomplete, fetch them
+        if (
+          !delivery.order ||
+          !delivery.order.total_price ||
+          delivery.order.total_price === 0
+        ) {
+          try {
+            const orderResponse = await axios.get(
+              `http://localhost:5002/api/orders/${delivery.order_id}`,
+              {
+                headers: {
+                  Cookie: req.headers.cookie, // Forward auth cookie
+                },
+              }
+            );
+
+            if (orderResponse.data) {
+              delivery.order = {
+                total_price: orderResponse.data.total_price || 0,
+                items: orderResponse.data.items?.length || 0,
+                subtotal: orderResponse.data.subtotal || 0,
+                tax_amount: orderResponse.data.tax_amount || 0,
+              };
+
+              // Save the updated delivery with order details
+              await delivery.save();
+            }
+          } catch (error) {
+            console.error(
+              `Failed to fetch order details for delivery ${delivery._id}:`,
+              error
+            );
+          }
+        }
+        return delivery;
+      })
+    );
+
+    res.status(200).json(enhancedDeliveries);
   } catch (error) {
     console.error("Error fetching deliveries for delivery person:", error);
     res
@@ -537,25 +742,230 @@ exports.getDeliveriesForDeliveryPerson = async (req, res) => {
   }
 };
 
-// Get delivery history for a specific delivery person
+// Update the getDeliveryHistoryForDeliveryPerson function to better handle errors and log data
 exports.getDeliveryHistoryForDeliveryPerson = async (req, res) => {
   try {
     const { delivery_person_id } = req.params;
+    console.log(
+      `Fetching delivery history for delivery person ${delivery_person_id}`
+    );
 
     const deliveries = await Delivery.find({
       delivery_person_id,
       status: { $in: ["DELIVERED", "CANCELLED"] },
     }).sort({ createdAt: -1 });
 
-    res.status(200).json(deliveries);
+    console.log(
+      `Found ${deliveries.length} deliveries in history for ${delivery_person_id}`
+    );
+
+    // Enhance deliveries with complete order details if needed
+    const enhancedDeliveries = await Promise.all(
+      deliveries.map(async (delivery) => {
+        // If order details are missing or incomplete, fetch them
+        if (
+          !delivery.order ||
+          !delivery.order.total_price ||
+          delivery.order.total_price === 0
+        ) {
+          try {
+            console.log(
+              `Fetching order details for delivery ${delivery._id}, order_id: ${delivery.order_id}`
+            );
+            const orderResponse = await axios.get(
+              `http://localhost:5002/api/orders/${delivery.order_id}`,
+              {
+                headers: {
+                  Cookie: req.headers.cookie, // Forward auth cookie
+                },
+              }
+            );
+
+            if (orderResponse.data) {
+              delivery.order = {
+                total_price: orderResponse.data.total_price || 0,
+                items: orderResponse.data.items?.length || 0,
+                subtotal: orderResponse.data.subtotal || 0,
+                tax_amount: orderResponse.data.tax_amount || 0,
+              };
+
+              console.log(
+                `Updated delivery ${delivery._id} with order details:`,
+                delivery.order
+              );
+
+              // Save the updated delivery with order details
+              await delivery.save();
+            }
+          } catch (error) {
+            console.error(
+              `Failed to fetch order details for delivery ${delivery._id}:`,
+              error
+            );
+          }
+        }
+        return delivery;
+      })
+    );
+
+    console.log(`Returning ${enhancedDeliveries.length} enhanced deliveries`);
+    res.status(200).json(enhancedDeliveries);
   } catch (error) {
     console.error("Error fetching delivery history:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error fetching delivery history",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching delivery history",
+      error: error.message,
+    });
+  }
+};
+
+// Get earnings statistics for a specific delivery person
+exports.getEarningsStats = async (req, res) => {
+  try {
+    const { delivery_person_id } = req.params;
+    const { timeFilter } = req.query;
+
+    // Get delivery history
+    const deliveries = await Delivery.find({
+      delivery_person_id,
+      status: "DELIVERED",
+    }).sort({ delivered_at: -1 });
+
+    // Enhance deliveries with complete order details if needed
+    const enhancedDeliveries = await Promise.all(
+      deliveries.map(async (delivery) => {
+        // If order details are missing or incomplete, fetch them
+        if (
+          !delivery.order ||
+          !delivery.order.total_price ||
+          delivery.order.total_price === 0
+        ) {
+          try {
+            const orderResponse = await axios.get(
+              `http://localhost:5002/api/orders/${delivery.order_id}`,
+              {
+                headers: {
+                  Cookie: req.headers.cookie, // Forward auth cookie
+                },
+              }
+            );
+
+            if (orderResponse.data) {
+              delivery.order = {
+                total_price: orderResponse.data.total_price || 0,
+                items: orderResponse.data.items?.length || 0,
+                subtotal: orderResponse.data.subtotal || 0,
+                tax_amount: orderResponse.data.tax_amount || 0,
+              };
+
+              // Save the updated delivery with order details
+              await delivery.save();
+            }
+          } catch (error) {
+            console.error(
+              `Failed to fetch order details for delivery ${delivery._id}:`,
+              error
+            );
+          }
+        }
+        return delivery;
+      })
+    );
+
+    // Calculate earnings from delivery history
+    const earningsHistory = enhancedDeliveries.map((delivery) => {
+      // Calculate earnings (80% of delivery fee, which is 10% of order total)
+      const deliveryFee = delivery.order?.total_price * 0.1 || 0;
+      const earnings = deliveryFee * 0.8;
+
+      return {
+        ...delivery.toObject(),
+        earnings: earnings,
+        date: delivery.delivered_at || delivery.createdAt,
+      };
+    });
+
+    // Filter by time if specified
+    let filteredEarnings = [...earningsHistory];
+
+    if (timeFilter) {
+      const now = new Date();
+
+      if (timeFilter === "today") {
+        const today = now.toDateString();
+        filteredEarnings = earningsHistory.filter(
+          (delivery) => new Date(delivery.date).toDateString() === today
+        );
+      } else if (timeFilter === "week") {
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        weekStart.setHours(0, 0, 0, 0);
+
+        filteredEarnings = earningsHistory.filter(
+          (delivery) => new Date(delivery.date) >= weekStart
+        );
+      } else if (timeFilter === "month") {
+        const monthStart = new Date(now);
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+
+        filteredEarnings = earningsHistory.filter(
+          (delivery) => new Date(delivery.date) >= monthStart
+        );
+      } else if (timeFilter === "year") {
+        const yearStart = new Date(now);
+        yearStart.setMonth(0, 1);
+        yearStart.setHours(0, 0, 0, 0);
+
+        filteredEarnings = earningsHistory.filter(
+          (delivery) => new Date(delivery.date) >= yearStart
+        );
+      }
+    }
+
+    // Calculate total earnings
+    const totalEarnings = filteredEarnings.reduce(
+      (sum, delivery) => sum + delivery.earnings,
+      0
+    );
+
+    // Calculate today's earnings
+    const today = new Date().toDateString();
+    const todayEarnings = earningsHistory
+      .filter((delivery) => new Date(delivery.date).toDateString() === today)
+      .reduce((sum, delivery) => sum + delivery.earnings, 0);
+
+    // Calculate this week's earnings
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekEarnings = earningsHistory
+      .filter((delivery) => new Date(delivery.date) >= weekStart)
+      .reduce((sum, delivery) => sum + delivery.earnings, 0);
+
+    // Calculate this month's earnings
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const monthEarnings = earningsHistory
+      .filter((delivery) => new Date(delivery.date) >= monthStart)
+      .reduce((sum, delivery) => sum + delivery.earnings, 0);
+
+    res.status(200).json({
+      total: totalEarnings,
+      today: todayEarnings,
+      thisWeek: weekEarnings,
+      thisMonth: monthEarnings,
+      history: filteredEarnings,
+    });
+  } catch (error) {
+    console.error("Error fetching earnings stats:", error);
+    res.status(500).json({
+      message: "Error fetching earnings statistics",
+      error: error.message,
+    });
   }
 };
 
@@ -567,15 +977,54 @@ exports.getAvailableDeliveries = async (req, res) => {
       status: "PENDING",
     }).sort({ createdAt: -1 });
 
-    res.status(200).json(deliveries);
+    // Enhance deliveries with complete order details if needed
+    const enhancedDeliveries = await Promise.all(
+      deliveries.map(async (delivery) => {
+        // If order details are missing or incomplete, fetch them
+        if (
+          !delivery.order ||
+          !delivery.order.total_price ||
+          delivery.order.total_price === 0
+        ) {
+          try {
+            const orderResponse = await axios.get(
+              `http://localhost:5002/api/orders/${delivery.order_id}`,
+              {
+                headers: {
+                  Cookie: req.headers.cookie, // Forward auth cookie
+                },
+              }
+            );
+
+            if (orderResponse.data) {
+              delivery.order = {
+                total_price: orderResponse.data.total_price || 0,
+                items: orderResponse.data.items?.length || 0,
+                subtotal: orderResponse.data.subtotal || 0,
+                tax_amount: orderResponse.data.tax_amount || 0,
+              };
+
+              // Save the updated delivery with order details
+              await delivery.save();
+            }
+          } catch (error) {
+            console.error(
+              `Failed to fetch order details for delivery ${delivery._id}:`,
+              error
+            );
+          }
+        }
+        return delivery;
+      })
+    );
+
+    res.status(200).json(enhancedDeliveries);
   } catch (error) {
     console.error("Error fetching available deliveries:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error fetching available deliveries",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching available deliveries",
+      error: error.message,
+    });
   }
 };
 
@@ -651,12 +1100,10 @@ exports.getOrdersReadyForPickup = async (req, res) => {
     res.status(200).json(response.data);
   } catch (error) {
     console.error("Error fetching orders ready for pickup:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error fetching orders ready for pickup",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching orders ready for pickup",
+      error: error.message,
+    });
   }
 };
 
