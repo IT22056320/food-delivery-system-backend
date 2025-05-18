@@ -1,20 +1,29 @@
 const mongoose = require("mongoose");
 
-// Define a simpler schema structure that follows MongoDB's GeoJSON requirements exactly
 const orderSchema = new mongoose.Schema(
   {
     customer_id: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
     },
     restaurant_id: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
     },
     items: [
       {
+        item_id: {
+          type: mongoose.Schema.Types.ObjectId,
+        },
         menu_id: {
+          type: mongoose.Schema.Types.ObjectId,
+        },
+        name: {
           type: String,
+          required: true,
+        },
+        price: {
+          type: Number,
           required: true,
         },
         quantity: {
@@ -22,47 +31,56 @@ const orderSchema = new mongoose.Schema(
           required: true,
           min: 1,
         },
-        price: {
-          type: Number,
-          required: true,
-        },
+        special_instructions: String,
       },
     ],
     total_price: {
       type: Number,
       required: true,
     },
-    extra_notes: {
-      type: [String],
-      default: [],
+    subtotal: {
+      type: Number,
+      required: true,
+    },
+    tax_amount: {
+      type: Number,
+      default: 0,
+    },
+    tax_rate: {
+      type: Number,
+      default: 0.08, // 8% tax rate
     },
     delivery_address: {
       type: String,
       required: true,
     },
-    // Store standard lat/lng separately for easy access
     delivery_coordinates: {
-      lat: {
-        type: Number,
-        required: true,
-      },
-      lng: {
-        type: Number,
-        required: true,
-      },
+      lat: Number,
+      lng: Number,
     },
-    // This is the proper GeoJSON field that MongoDB expects
     delivery_location: {
       type: {
         type: String,
         enum: ["Point"],
-        required: true,
+        default: "Point",
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
         required: true,
       },
     },
+    payment_method: {
+      type: String,
+      enum: ["CARD", "CASH", "WALLET"],
+      required: true,
+    },
+    payment_status: {
+      type: String,
+      enum: ["PENDING", "COMPLETED", "FAILED", "REFUNDED"],
+      default: "PENDING",
+    },
+    stripe_payment_id: String,
+    refund_id: String,
     order_status: {
       type: String,
       enum: [
@@ -75,53 +93,24 @@ const orderSchema = new mongoose.Schema(
         "CANCELLED",
         "REFUNDED",
       ],
-      default: "PENDING", // Explicitly set default to PENDING
-    },
-    payment_status: {
-      type: String,
-      enum: [
-        "PENDING",
-        "COMPLETED",
-        "FAILED",
-        "CANCELLED",
-        "REFUNDED",
-        "DECLINED",
-      ],
-      required: true,
       default: "PENDING",
     },
-    payment_method: {
-      type: String,
-      enum: ["CASH_ON_DELIVERY", "CARD"],
-      required: true,
-    },
-    stripe_payment_id: {
-      type: String,
-      default: null,
-    },
-    refund_id: {
-      type: String,
-      default: null,
-    },
-    order_processing_time: {
-      type: Date,
-      default: Date.now,
-    },
-    out_delivery_time: {
-      type: Date,
-    },
-    delivery_time: {
-      type: Date,
-    },
-    delivery_id: {
-      type: String,
-      default: null,
-    },
+    extra_notes: [String],
+    estimated_delivery_time: Date,
+    actual_delivery_time: Date,
+    out_delivery_time: Date,
+    delivery_time: Date,
   },
   { timestamps: true }
 );
 
-// Create a 2dsphere index directly on the delivery_location field
+// Add this validation before the timestamps option
+orderSchema.path("items").validate((items) => {
+  if (!items || items.length === 0) return false;
+  return items.every((item) => item.menu_id || item.item_id);
+}, "Each item must have either menu_id or item_id");
+
+// Add index for geospatial queries
 orderSchema.index({ delivery_location: "2dsphere" });
 
 module.exports = mongoose.model("Order", orderSchema);

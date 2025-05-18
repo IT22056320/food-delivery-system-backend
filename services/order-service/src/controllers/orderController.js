@@ -1,4 +1,5 @@
 const Order = require("../models/Order");
+const Transaction = require("../models/Transaction");
 const axios = require("axios");
 
 // Create a new order
@@ -37,12 +38,29 @@ exports.createOrder = async (req, res) => {
         .json({ error: "Valid delivery location coordinates are required" });
     }
 
+    // Process items to ensure compatibility with both menu_id and item_id
+    const processedItems = items.map((item) => {
+      // If item has menu_id but not item_id, copy menu_id to item_id for backward compatibility
+      if (item.menu_id && !item.item_id) {
+        return { ...item, item_id: item.menu_id };
+      }
+      return item;
+    });
+
+    // Calculate tax (8% of total price)
+    const taxRate = 0.08;
+    const taxAmount = Number.parseFloat((total_price * taxRate).toFixed(2));
+    const finalPrice = Number.parseFloat((total_price + taxAmount).toFixed(2));
+
     // Create new order
     const newOrder = new Order({
       customer_id: req.user.id,
       restaurant_id,
-      items,
-      total_price,
+      items: processedItems,
+      total_price: finalPrice,
+      subtotal: total_price,
+      tax_amount: taxAmount,
+      tax_rate: taxRate,
       delivery_address,
       delivery_coordinates: {
         lat: delivery_location.coordinates.lat,
@@ -63,6 +81,28 @@ exports.createOrder = async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
+    // Create transaction record directly in the database instead of making an API call
+    try {
+      const newTransaction = new Transaction({
+        orderId: savedOrder._id,
+        amount: finalPrice,
+        taxAmount: taxAmount,
+        paymentMethod: payment_method,
+        status: "pending",
+        customerId: req.user.id,
+        restaurantId: restaurant_id,
+      });
+
+      await newTransaction.save();
+      console.log("Transaction created successfully:", newTransaction._id);
+    } catch (transactionError) {
+      console.error(
+        "Error creating transaction record:",
+        transactionError.message
+      );
+      // Continue execution even if transaction creation fails
+    }
+
     // If payment method is card, create a payment intent
     if (payment_method === "CARD") {
       try {
@@ -70,7 +110,7 @@ exports.createOrder = async (req, res) => {
         const paymentResponse = await axios.post(
           "http://localhost:5004/api/payments/create-payment-intent",
           {
-            amount: total_price,
+            amount: finalPrice,
             order_id: savedOrder._id,
             metadata: {
               customer_id: req.user.id,
@@ -128,6 +168,20 @@ exports.updatePaymentStatus = async (req, res) => {
     // Let restaurant owners manually accept orders
 
     await order.save();
+
+    // Update transaction status
+    try {
+      await Transaction.findOneAndUpdate(
+        { orderId: order._id },
+        { status: paymentStatus.toLowerCase() },
+        { new: true }
+      );
+    } catch (transactionError) {
+      console.error(
+        "Error updating transaction status:",
+        transactionError.message
+      );
+    }
 
     // If payment is completed, create delivery record
     if (paymentStatus === "COMPLETED") {
@@ -204,6 +258,23 @@ exports.processRefund = async (req, res) => {
     order.refund_id = refundId;
 
     await order.save();
+
+    // Update transaction status to refunded
+    try {
+      await Transaction.findOneAndUpdate(
+        { orderId: order._id },
+        {
+          status: "refunded",
+          refundedAt: new Date(),
+        },
+        { new: true }
+      );
+    } catch (transactionError) {
+      console.error(
+        "Error updating transaction status for refund:",
+        transactionError.message
+      );
+    }
 
     res.status(200).json({
       success: true,
