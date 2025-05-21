@@ -1,9 +1,8 @@
-version: '3.8'
+version: '3'
 
 services:
   auth-service:
     build: ./services/auth-service
-    container_name: auth-service
     ports:
       - "5000:5000"
     environment:
@@ -19,7 +18,6 @@ services:
 
   restaurant-service:
     build: ./services/restaurant-service
-    container_name: restaurant-service
     ports:
       - "5001:5001"
     environment:
@@ -30,12 +28,16 @@ services:
       - PORT=5001
       - GOOGLE_CLIENT_ID=703814824617-cinrnonku243qlmlmg453crqgtl94ovl.apps.googleusercontent.com
       - GOOGLE_CLIENT_SECRET=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
+      - CLOUDINARY_CLOUD_NAME=dla7mxkdu
+      - CLOUDINARY_API_KEY=378967735217792
+      - CLOUDINARY_API_SECRET=FGNqamK1atSmzn8v4UmSHU7uAQI
     networks:
       - food-delivery-network
+    depends_on:
+      - auth-service
 
   order-service:
     build: ./services/order-service
-    container_name: order-service
     ports:
       - "5002:5002"
     environment:
@@ -48,12 +50,11 @@ services:
       - EMAIL_PASS=qpso aweo pmlk xyow
     networks:
       - food-delivery-network
+    depends_on:
+      - restaurant-service
 
   delivery-service:
-    build:
-      context: ./services/delivery-service
-      dockerfile: Dockerfile
-    container_name: delivery-service
+    build: ./services/delivery-service
     ports:
       - "5003:5003"
     environment:
@@ -65,16 +66,13 @@ services:
       - GOOGLE_CLIENT_ID=703814824617-cinrnonku243qlmlmg453crqgtl94ovl.apps.googleusercontent.com
       - GOOGLE_CLIENT_SECRET=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
       - ORDER_SERVICE_URL=http://order-service:5002/api/orders
-    depends_on:
-      - order-service
     networks:
       - food-delivery-network
+    depends_on:
+      - order-service
 
   notification-service:
-    build:
-      context: ./services/notification-service
-      dockerfile: Dockerfile
-    container_name: notification-service
+    build: ./services/notification-service
     ports:
       - "5004:5004"
     environment:
@@ -88,24 +86,43 @@ services:
       - PORT=5004
     networks:
       - food-delivery-network
+    depends_on:
+      - auth-service
+
+  payment-service:
+    build: ./services/payment-service
+    ports:
+      - "5005:5005"
+    environment:
+      - MONGO_URI=mongodb+srv://udulajoker026:CvARzY4spvLIQ75l@cluster0.2imectr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+      - PORT=5005
+      - JWT_SECRET=secret
+      - STRIPE_SECRET_KEY=sk_test_51RFXHwRrlMKGq9bMZnBHYawb33nMVND8wcPO7tbr22sIignw7YySyD42Ui8EqGPN9R41Zz6nNPZ4Qp4Vv8XWYZRY00teZMHq0h
+      - STRIPE_WEBHOOK_SECRET=whsec_haPAOmcjdrIPE2FLZSTleoYAlzJD4D2M
+      - EMAIL_USER=madhini00@gmail.com
+      - EMAIL_PASS=qpso aweo pmlk xyow
+    networks:
+      - food-delivery-network
+    depends_on:
+      - order-service
 
   frontend:
-    build: ../food-delivery-system-frontend
-    container_name: frontend
+    build: .
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:5001/api
       - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_51RFXHwRrlMKGq9bMbT1dBLXnGGkqMguFHeaqOdgM6zaEkUGEkyQSn0J72DtSnSHEPOJ7EqyQbNILaVpmFGNTSY6v008YHy958A
       - NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyCmoMpEzjYLj2TH148EMIdzaHg0QzUj7ko
+    networks:
+      - food-delivery-network
     depends_on:
       - auth-service
       - restaurant-service
       - order-service
       - delivery-service
       - notification-service
-    networks:
-      - food-delivery-network
+      - payment-service
 
 networks:
   food-delivery-network:

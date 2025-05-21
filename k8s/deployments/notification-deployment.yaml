@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-deployment
+  namespace: food-delivery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-container
+          image: pastadudde/food-delivery-notification-service:latest
+          ports:
+            - containerPort: 5004
+          envFrom:
+            - secretRef:
+                name: notification-secrets

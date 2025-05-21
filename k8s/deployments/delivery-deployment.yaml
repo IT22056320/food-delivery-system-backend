@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delivery-deployment
+  namespace: food-delivery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: delivery-service
+  template:
+    metadata:
+      labels:
+        app: delivery-service
+    spec:
+      containers:
+        - name: delivery-container
+          image: pastadudde/food-delivery-delivery-service:latest
+          ports:
+            - containerPort: 5003
+          envFrom:
+            - secretRef:
+                name: delivery-secrets
