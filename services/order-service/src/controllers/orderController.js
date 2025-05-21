@@ -1,6 +1,24 @@
 const Order = require("../models/Order");
 const Transaction = require("../models/Transaction");
+const { sendNotification } = require("../utils/notificationClient");
 const axios = require("axios");
+
+const getUserEmailById = async (userId) => {
+  try {
+    const response = await axios.get(`http://localhost:5000/api/users/internal/${userId}`);
+    
+    const user = response.data;
+
+    if (!user || !user.email) {
+      throw new Error('User or email not found');
+    }
+
+    return user.email;
+  } catch (error) {
+    console.error('Failed to get user email:', error.response?.data || error.message);
+    return null;
+  }
+};
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -9,6 +27,10 @@ exports.createOrder = async (req, res) => {
       restaurant_id,
       items,
       total_price,
+      subtotal,
+      tax_amount,
+      delivery_fee,
+      delivery_distance,
       delivery_address,
       delivery_location,
       payment_method,
@@ -47,20 +69,33 @@ exports.createOrder = async (req, res) => {
       return item;
     });
 
-    // Calculate tax (8% of total price)
+    // Calculate tax if not provided (8% of subtotal)
     const taxRate = 0.08;
-    const taxAmount = Number.parseFloat((total_price * taxRate).toFixed(2));
-    const finalPrice = Number.parseFloat((total_price + taxAmount).toFixed(2));
+    const calculatedTaxAmount =
+      tax_amount || Number.parseFloat((subtotal * taxRate).toFixed(2));
+
+    // Use provided delivery fee or default to 2.99
+    const calculatedDeliveryFee = delivery_fee || 2.99;
+
+    // Calculate final price if not provided
+    const calculatedTotalPrice =
+      total_price ||
+      Number.parseFloat(
+        (subtotal + calculatedTaxAmount + calculatedDeliveryFee).toFixed(2)
+      );
 
     // Create new order
     const newOrder = new Order({
       customer_id: req.user.id,
       restaurant_id,
       items: processedItems,
-      total_price: finalPrice,
-      subtotal: total_price,
-      tax_amount: taxAmount,
+      total_price: calculatedTotalPrice,
+      subtotal:
+        subtotal || total_price - calculatedTaxAmount - calculatedDeliveryFee,
+      tax_amount: calculatedTaxAmount,
       tax_rate: taxRate,
+      delivery_fee: calculatedDeliveryFee,
+      delivery_distance: delivery_distance || 0,
       delivery_address,
       delivery_coordinates: {
         lat: delivery_location.coordinates.lat,
@@ -81,12 +116,23 @@ exports.createOrder = async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
+    console.log(req.user.email);
+    const email = await getUserEmailById(req.user.id);
+
+    await sendNotification({
+      email: email,
+      contactNumber: "+94718712335",
+      message: `Your order has been placed successfully. Order ID: ${savedOrder._id}`,
+      channel: "both",
+    });
+
     // Create transaction record directly in the database instead of making an API call
     try {
       const newTransaction = new Transaction({
         orderId: savedOrder._id,
-        amount: finalPrice,
-        taxAmount: taxAmount,
+        amount: calculatedTotalPrice,
+        taxAmount: calculatedTaxAmount,
+        deliveryFee: calculatedDeliveryFee,
         paymentMethod: payment_method,
         status: "pending",
         customerId: req.user.id,
@@ -110,7 +156,7 @@ exports.createOrder = async (req, res) => {
         const paymentResponse = await axios.post(
           "http://localhost:5004/api/payments/create-payment-intent",
           {
-            amount: finalPrice,
+            amount: calculatedTotalPrice,
             order_id: savedOrder._id,
             metadata: {
               customer_id: req.user.id,
@@ -168,6 +214,17 @@ exports.updatePaymentStatus = async (req, res) => {
     // Let restaurant owners manually accept orders
 
     await order.save();
+
+    const email = await getUserEmailById(req.user.id);
+
+    if (paymentStatus === "COMPLETED") {
+      await sendNotification({
+        email: email,
+        contactNumber: "+94718712335",
+        message: `Your payment for Order ID: ${order._id} has been successfully completed.`,
+        channel: "both",
+      });
+    }
 
     // Update transaction status
     try {
@@ -257,7 +314,18 @@ exports.processRefund = async (req, res) => {
     order.order_status = "REFUNDED";
     order.refund_id = refundId;
 
+    console.log(req.user.email)
+    
+
     await order.save();
+    const email = await getUserEmailById(req.user.id);
+
+    await sendNotification({
+      email: email,
+      contactNumber: "+94718712335",
+      message: `Your order (ID: ${order._id}) has been refunded. Refund ID: ${refundId}`,
+      channel: "both",
+    });
 
     // Update transaction status to refunded
     try {
@@ -363,6 +431,15 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     await order.save();
+
+    console.log(req.user.email);
+    const email = await getUserEmailById(req.user.id);
+    await sendNotification({
+      email: email,
+      contactNumber: "+94718712335",
+      message: `Your order status has been updated to: ${order.order_status}`,
+      channel: "both",
+    });
 
     res.status(200).json(order);
   } catch (error) {
