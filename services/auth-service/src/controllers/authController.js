@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const { hashPassword, comparePasswords } = require('../utils/passwordUtils');
 const { generateToken } = require('../utils/tokenUtils');
-const { sendOtp } = require('../utils/notificationClient');
+const { sendOtp, sendNotification } = require('../utils/notificationClient');
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -40,8 +40,7 @@ exports.verifyOtp = async (req, res) => {
   user.isVerified = true;
   user.otp = null;
   await user.save();
-  const { sendNotification } = require('../utils/notificationClient');
-
+ 
 await sendNotification({
   email: user.email,
   contactNumber: '+94718712335',

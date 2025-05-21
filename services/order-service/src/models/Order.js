@@ -50,6 +50,14 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0.08, // 8% tax rate
     },
+    delivery_fee: {
+      type: Number,
+      default: 2.99,
+    },
+    delivery_distance: {
+      type: Number,
+      default: 0,
+    },
     delivery_address: {
       type: String,
       required: true,
@@ -71,7 +79,7 @@ const orderSchema = new mongoose.Schema(
     },
     payment_method: {
       type: String,
-      enum: ["CARD", "CASH", "WALLET"],
+      enum: ["CARD", "CASH_ON_DELIVERY", "CASH", "WALLET"],
       required: true,
     },
     payment_status: {

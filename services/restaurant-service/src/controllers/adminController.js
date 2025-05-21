@@ -1,5 +1,24 @@
 const Restaurant = require("../models/Restaurant")
 const Order = require("../models/Order")
+const { sendNotification } = require('../utils/notificationClient')
+// const axios = require("axios");
+
+// const getUserEmailById = async (userId) => {
+//   try {
+//     const response = await axios.get(`http://localhost:5000/api/users/internal/${userId}`);
+    
+//     const user = response.data;
+
+//     if (!user || !user.email) {
+//       throw new Error('User or email not found');
+//     }
+
+//     return user.email;
+//   } catch (error) {
+//     console.error('Failed to get user email:', error.response?.data || error.message);
+//     return null;
+//   }
+// };
 
 // Verify restaurant
 exports.verifyRestaurant = async (req, res) => {
@@ -30,6 +49,17 @@ exports.verifyRestaurant = async (req, res) => {
             message: "Restaurant verified successfully",
             restaurant,
         })
+
+        // Send notification to restaurant owner
+        // const email = await getUserEmailById(req.user.id);
+        
+            await sendNotification({
+              email: restaurant.email,
+              contactNumber: "+94718712335",
+              message: `Your restaurant ${restaurant.name} has been verified successfully.`,
+              channel: "both",
+            });
+
     } catch (error) {
         res.status(500).json({
             error: error instanceof Error ? error.message : "Failed to verify restaurant",

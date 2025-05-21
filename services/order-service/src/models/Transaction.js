@@ -4,8 +4,8 @@ const transactionSchema = new mongoose.Schema(
   {
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Order",
       required: true,
+      ref: "Order",
     },
     amount: {
       type: Number,
@@ -15,9 +15,13 @@ const transactionSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    deliveryFee: {
+      type: Number,
+      default: 2.99,
+    },
     paymentMethod: {
       type: String,
-      enum: ["CARD", "CASH", "WALLET"],
+      enum: ["card", "cash", "cash_on_delivery", "wallet"],
       required: true,
     },
     status: {
@@ -25,20 +29,17 @@ const transactionSchema = new mongoose.Schema(
       enum: ["pending", "completed", "failed", "refunded"],
       default: "pending",
     },
+    paymentIntentId: String,
+    refundId: String,
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
       required: true,
     },
     restaurantId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Restaurant",
       required: true,
     },
-    refundedAt: {
-      type: Date,
-      default: null,
-    },
+    refundedAt: Date,
   },
   { timestamps: true }
 );
