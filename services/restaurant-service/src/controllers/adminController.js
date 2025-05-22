@@ -57,7 +57,7 @@ exports.verifyRestaurant = async (req, res) => {
               email: restaurant.email,
               contactNumber: "+94718712335",
               message: `Your restaurant ${restaurant.name} has been verified successfully.`,
-              channel: "both",
+              channel: "email",
             });
 
     } catch (error) {

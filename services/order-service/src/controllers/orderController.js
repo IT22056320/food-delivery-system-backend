@@ -123,7 +123,7 @@ exports.createOrder = async (req, res) => {
       email: email,
       contactNumber: "+94718712335",
       message: `Your order has been placed successfully. Order ID: ${savedOrder._id}`,
-      channel: "both",
+      channel: "email",
     });
 
     // Create transaction record directly in the database instead of making an API call
@@ -222,7 +222,7 @@ exports.updatePaymentStatus = async (req, res) => {
         email: email,
         contactNumber: "+94718712335",
         message: `Your payment for Order ID: ${order._id} has been successfully completed.`,
-        channel: "both",
+        channel: "email",
       });
     }
 
@@ -324,7 +324,7 @@ exports.processRefund = async (req, res) => {
       email: email,
       contactNumber: "+94718712335",
       message: `Your order (ID: ${order._id}) has been refunded. Refund ID: ${refundId}`,
-      channel: "both",
+      channel: "email",
     });
 
     // Update transaction status to refunded
@@ -438,7 +438,7 @@ exports.updateOrderStatus = async (req, res) => {
       email: email,
       contactNumber: "+94718712335",
       message: `Your order status has been updated to: ${order.order_status}`,
-      channel: "both",
+      channel: "email",
     });
 
     res.status(200).json(order);

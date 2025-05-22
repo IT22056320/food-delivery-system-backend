@@ -24,7 +24,7 @@ await sendOtp({
   contactNumber: '+94718712335',  // if available
   message: 'Your verification OTP',
   otp,
-  channel: 'both',  // or 'sms' / 'both' (decide from user input)
+  channel: 'email',  // or 'sms' / 'both' (decide from user input)
 });
   res.status(201).json({ message: 'OTP sent to email', userId: user._id });
 };
@@ -45,7 +45,7 @@ await sendNotification({
   email: user.email,
   contactNumber: '+94718712335',
   message: 'Your account has been successfully verified!',
-  channel: 'both',  // or 'sms' / 'both'
+  channel: 'email',  // or 'sms' / 'both'
 });
 
 
@@ -98,7 +98,7 @@ exports.forgotPassword = async (req, res) => {
     contactNumber: '+94718712335',
     message: 'Your password reset OTP',
     otp,
-    channel: 'both',  // or 'sms' / 'both'
+    channel: 'email',  // or 'sms' / 'both'
   });  
   res.json({ message: 'OTP sent to your email' });
 };
